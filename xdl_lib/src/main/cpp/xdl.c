@@ -37,7 +37,6 @@
 #include <pthread.h>
 #include <android/api-level.h>
 #include "xdl.h"
-#include "xdl.h"
 #include "xdl_iterate.h"
 #include "xdl_util.h"
 #include "xdl_lzma.h"
