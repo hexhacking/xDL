@@ -8,6 +8,8 @@
 
 xDL is an enhanced implementation of the Android DL series functions.
 
+[README 中文版](README.zh-CN.md)
+
 
 ## Features
 
