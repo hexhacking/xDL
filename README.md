@@ -120,7 +120,7 @@ Notice:
 
 ### 3. `xdl_addr()`
 
-```
+```c
 int xdl_addr(void *addr, Dl_info *info, char *tmpbuf, size_t tmpbuf_len);
 ```
 
