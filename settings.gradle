@@ -1,0 +1,3 @@
+include ':xdl_lib'
+include ':xdl_sample'
+rootProject.name = "xDL"
