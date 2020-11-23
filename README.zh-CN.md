@@ -39,6 +39,14 @@ xDL 是 Android DL 系列函数的增强实现。
 
 ## 使用
 
+* 通过包含源码使用 xDL：
+
+```
+git submodule add https://github.com/hexhacking/xDL.git external/xdl
+```
+
+* 或者，通过 gradle 依赖使用 xDL：
+
 ### 1. 增加依赖
 
 ```Gradle
@@ -61,7 +69,9 @@ android {
 
 ### 3. 下载头文件
 
-从 [这里](xdl_lib/src/main/cpp/xdl.h) 下载头文件，注意核对文件中的版本号。然后把头文件放在你工程的合适位置里。
+从 [这里](xdl_lib/src/main/cpp/xdl.h) 下载头文件，从 [这里](https://dl.bintray.com/hexhacking/maven/io/hexhacking/xdl/xdl-android-lib/) 下载 AAR 并解压。
+
+把头文件和动态库放在你工程的合适位置，然后配置你的 CMakeLists.txt 或 Android.mk。
 
 你可以参考 [xdl-sample](xdl_sample) 文件中的示例 app。
 
@@ -109,14 +119,15 @@ void *xdl_dsym(void *handle, const char *symbol);
 
 它们和 `dlsym()` 很相似。 它们都需要传递一个 `xdl_open()` 返回的 “handle”，和一个 null 结尾的符号名字，返回该符号在内存中的加载地址。
 
-`xdl_sym()` 从 `.dynsym` 中查询“动态链接符号，就像 `dlsym()` 做的那样。
+`xdl_sym()` 从 `.dynsym` 中查询 “动态链接符号”，就像 `dlsym()` 做的那样。
 
-`xdl_dsym()` 从 `.symtab` 和 “`.gnu_debugdata` 里的 `.symtab`” 中查询“调试符号”。
+`xdl_dsym()` 从 `.symtab` 和 “`.gnu_debugdata` 里的 `.symtab`” 中查询 “调试符号”。
 
-注意:
+注意：
 
-* 调试符号中也包含了所有的动态链接符号。
-* `xdl_dsym()` 需要从磁盘文件中加载调试符号，而 `xdl_sym()` 只从内存中查询动态链接符号。所以 `xdl_dsym()` 比 `xdl_sym()` 运行的更慢。如果你在查询的是动态链接符号，请使用 `xdl_sym()`。
+* `.dynsym` 和 `.symtab` 中的符号集合并没有相互包含的关系。有些符号只存在于 `.dynsym` 中，有些则只存在于 `.symtab` 中。你可能需要通过 readelf 之类的工具确定你要查找的符号在哪个 ELF section 中。
+* `xdl_dsym()` 需要从磁盘文件中加载调试符号，而 `xdl_sym()` 只从内存中查询动态链接符号。所以 `xdl_dsym()` 比 `xdl_sym()` 执行的更慢。
+* 动态链接器只使用 `.dynsym` 中的符号。调试器其实同时使用了 `.dynsym` 和 `.symtab` 中的符号。
 
 ### 3. `xdl_addr()`
 

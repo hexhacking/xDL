@@ -39,6 +39,14 @@ xDL is an enhanced implementation of the Android DL series functions.
 
 ## Usage
 
+* Use xDL by including the source code:
+
+```
+git submodule add https://github.com/hexhacking/xDL.git external/xdl
+```
+
+* Or, use xDL via gradle dependency:
+
 ### 1. Add dependency
 
 ```Gradle
@@ -59,9 +67,11 @@ android {
 }
 ```
 
-### 3. Download header file
+### 3. Download Header File and Dynamic Libraries
 
-Download the header file from [here](xdl_lib/src/main/cpp/xdl.h), pay attention to check the version number in the file. Then put the header file in the right place of your project.
+Download the header file from [here](xdl_lib/src/main/cpp/xdl.h), download AAR from [here](https://dl.bintray.com/hexhacking/maven/io/hexhacking/xdl/xdl-android-lib/) and unzip it.
+
+Put the header file and dynamic libraries in the right place of your project. Then configure your CMakeLists.txt or Android.mk.
 
 There is a sample app in the [xdl-sample](xdl_sample) folder you can refer to.
 
@@ -115,8 +125,9 @@ They are very similar to `dlsym()`. They all takes a "handle" of an ELF returned
 
 Notice:
 
-* All the dynamic link symbols that have been included in the debuging symbols.
-* `xdl_dsym()` needs to load debuging symbols from disk file, and `xdl_sym()` only lookup dynamic link symbols from memory. So `xdl_dsym()` runs slower than `xdl_sym()`. If the symbol you are looking for is a dynamic link symbol, please use `xdl_sym()`.
+* The symbol sets in `.dynsym` and `.symtab` do not contain each other. Some symbols only exist in `.dynsym`, and some only exist in `.symtab`. You may need to use tools such as readelf to determine which ELF section the symbol you are looking for is in.
+* `xdl_dsym()` needs to load debuging symbols from disk file, and `xdl_sym()` only lookup dynamic link symbols from memory. So `xdl_dsym()` runs slower than `xdl_sym()`.
+* The dynamic linker only uses symbols in `.dynsym`. The debugger actually uses the symbols in both `.dynsym` and `.symtab`.
 
 ### 3. `xdl_addr()`
 
