@@ -6,7 +6,7 @@ android {
     ndkVersion rootProject.ext.ndkVersion
 
     defaultConfig {
-        applicationId "io.hexhacking.xdl"
+        applicationId "io.hexhacking.xdl.sample"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
