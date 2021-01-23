@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.0.0-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.0.1-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2011-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -29,12 +29,14 @@ xDL 是 Android DL 系列函数的增强实现。
 
 ## 产出物体积
 
+如果将 xDL 编译成独立的动态库：
+
 | ABI         | 压缩后 (KB) | 未压缩 (KB) |
 | :---------- | ---------: | ---------: |
-| armeabi-v7a | 5.8        | 13.9       |
-| arm64-v8a   | 6.2        | 14.2       |
-| x86         | 6.4        | 13.8       |
-| x86_64      | 6.6        | 14.5       |
+| armeabi-v7a | 6.3        | 13.9       |
+| arm64-v8a   | 6.9        | 18.3       |
+| x86         | 7.0        | 13.8       |
+| x86_64      | 7.3        | 18.6       |
 
 
 ## 使用
@@ -45,13 +47,15 @@ xDL 是 Android DL 系列函数的增强实现。
 git submodule add https://github.com/hexhacking/xDL.git external/xdl
 ```
 
+xDL 的源码在这个文件夹里：[xdl_lib/src/main/cpp](xdl_lib/src/main/cpp)
+
 * 或者，通过 gradle 依赖使用 xDL：
 
 ### 1. 增加依赖
 
 ```Gradle
 dependencies {
-    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.0'
+    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.1'
 }
 ```
 
@@ -132,12 +136,23 @@ void *xdl_dsym(void *handle, const char *symbol);
 ### 3. `xdl_addr()`
 
 ```c
-int xdl_addr(void *addr, Dl_info *info, char *tmpbuf, size_t tmpbuf_len);
+int xdl_addr(void *addr, Dl_info *info, void **cache);
+void xdl_addr_clean(void **cache);
 ```
 
-`xdl_addr()` 和 `dladdr()` 很相似。`xdl_addr()` 不仅能查询动态链接符号，还能查询调试符号。
+`xdl_addr()` 和 `dladdr()` 很相似。但有以下几点不同：
 
-`xdl_addr()` 需要传递一个临时缓冲区和它的长度。这个缓冲区用于存放 `Dl_info *info` 结构体中的 `dlpi_name` 和 `dli_sname` 字符串。建议使用 512 或 1024 字节的缓冲区。`xdl_addr()` 返回以后，请保证 `tmpbuf` 的生命周期长于或等于 `Dl_info *info` 结构体的生命周期。
+* `xdl_addr()` 不仅能查询动态链接符号，还能查询调试符号。
+* `xdl_addr()` 需要传递一个附加的参数（cache），其中会缓存 `xdl_addr()` 执行过程中打开的 ELF handle，缓存的目的是使后续对同一个 ELF 的 `xdl_addr()` 执行的更快。当不需要再执行 `xdl_addr()` 时，请使用 `xdl_addr_clean()` 清除缓存。举例：
+
+```c
+void *cache = NULL;
+Dl_info info;
+xdl_addr(addr_1, &info, &cache);
+xdl_addr(addr_2, &info, &cache);
+xdl_addr(addr_3, &info, &cache);
+xdl_addr_clean(&cache);
+```
 
 ### 4. `xdl_iterate_phdr()`
 

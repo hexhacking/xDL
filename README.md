@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.0.0-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.0.1-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2011-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -15,7 +15,7 @@ xDL is an enhanced implementation of the Android DL series functions.
 
 * Enhanced `dlopen()` + `dlsym()` + `dladdr()`.
     * Lookup all loaded ELF in the current process, including system libraries.
-    * Lookup dynamic link symbols in `.dynsym`
+    * Lookup dynamic link symbols in `.dynsym`.
     * Lookup debuging symbols in `.symtab` and "`.symtab` in `.gnu_debugdata`".
 * Enhanced `dl_iterate_phdr()`.
     * Compatible with Android 4.x on ARM32.
@@ -29,12 +29,14 @@ xDL is an enhanced implementation of the Android DL series functions.
 
 ## Artifacts Size
 
+If xDL is compiled into an independent dynamic library:
+
 | ABI         | Compressed (KB) | Uncompressed (KB) |
 | :---------- | --------------: | ----------------: |
-| armeabi-v7a | 5.8             | 13.9              |
-| arm64-v8a   | 6.2             | 14.2              |
-| x86         | 6.4             | 13.8              |
-| x86_64      | 6.6             | 14.5              |
+| armeabi-v7a | 6.3             | 13.9              |
+| arm64-v8a   | 6.9             | 18.3              |
+| x86         | 7.0             | 13.8              |
+| x86_64      | 7.3             | 18.6              |
 
 
 ## Usage
@@ -45,13 +47,15 @@ xDL is an enhanced implementation of the Android DL series functions.
 git submodule add https://github.com/hexhacking/xDL.git external/xdl
 ```
 
+The source code of xDL is in this folder: [xdl_lib/src/main/cpp](xdl_lib/src/main/cpp)
+
 * Or, use xDL via gradle dependency:
 
 ### 1. Add dependency
 
 ```Gradle
 dependencies {
-    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.0'
+    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.1'
 }
 ```
 
@@ -132,12 +136,23 @@ Notice:
 ### 3. `xdl_addr()`
 
 ```c
-int xdl_addr(void *addr, Dl_info *info, char *tmpbuf, size_t tmpbuf_len);
+int xdl_addr(void *addr, Dl_info *info, void **cache);
+void xdl_addr_clean(void **cache);
 ```
 
-`xdl_addr()` is similar to `dladdr()`. `xdl_addr()` can lookup not only dynamic link symbols, but also debugging symbols.
+`xdl_addr()` is similar to `dladdr()`. But there are a few differences:
 
-`xdl_addr()` needs to pass an temporary buffer and the length of the buffer. This buffer is used to store the `dlpi_name` and `dli_sname` strings in `Dl_info *info` struct. It is recommended to pass a 512 or 1024 bytes buffer. After `xdl_addr()` returns, please ensure that the lifetime of `tmpbuf` is longer than or equal to the lifetime of `Dl_info *info` struct.
+* `xdl_addr()` can lookup not only dynamic link symbols, but also debugging symbols. 
+* `xdl_addr()` needs to pass an additional parameter (cache), which will cache the ELF handle opened during the execution of `xdl_addr()`. The purpose of caching is to make subsequent executions of `xdl_addr()` of the same ELF faster. When you do not need to execute `xdl_addr()`, please use `xdl_addr_clean()` to clear the cache. For example:
+
+```c
+void *cache = NULL;
+Dl_info info;
+xdl_addr(addr_1, &info, &cache);
+xdl_addr(addr_2, &info, &cache);
+xdl_addr(addr_3, &info, &cache);
+xdl_addr_clean(&cache);
+```
 
 ### 4. `xdl_iterate_phdr()`
 

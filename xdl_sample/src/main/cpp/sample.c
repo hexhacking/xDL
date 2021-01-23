@@ -67,7 +67,7 @@ static void sample_test_iterate(void)
     usleep(100 * 1000);
 }
 
-static void sample_test_dlsym(const char *filename, const char *symbol, bool debug_symbol)
+static void sample_test_dlsym(const char *filename, const char *symbol, bool debug_symbol, void **cache)
 {
     LOG("+++ xdl_open + %s + xdl_addr", debug_symbol ? "xdl_dsym" : "xdl_sym");
 
@@ -86,8 +86,7 @@ static void sample_test_dlsym(const char *filename, const char *symbol, bool deb
 
     // xdl_addr
     Dl_info info;
-    char buf[512];
-    if(0 == xdl_addr(symbol_addr, &info, buf, sizeof(buf)))
+    if(0 == xdl_addr(symbol_addr, &info, cache))
         LOG(">>> xdl_addr(%"PRIxPTR") : FAILED", (uintptr_t)symbol_addr);
     else
         LOG(">>> xdl_addr(%"PRIxPTR") : %"PRIxPTR" %s, %"PRIxPTR" %s", (uintptr_t)symbol_addr,
@@ -102,19 +101,25 @@ static void sample_test(JNIEnv *env, jobject thiz)
     (void)env;
     (void)thiz;
 
+    // cache for xdl_addr()
+    void *cache = NULL;
+
     // iterate
     sample_test_iterate();
 
     // linker
-    sample_test_dlsym(BASENAME_LINKER, "__dl__ZL10g_dl_mutex", true);
+    sample_test_dlsym(BASENAME_LINKER, "__dl__ZL10g_dl_mutex", true, &cache);
 
     // libc.so
-    sample_test_dlsym(PATHNAME_LIBC_FIXED, "android_set_abort_message", false);
-    sample_test_dlsym(PATHNAME_LIBC_FIXED, "je_mallctl", true);
+    sample_test_dlsym(PATHNAME_LIBC_FIXED, "android_set_abort_message", false, &cache);
+    sample_test_dlsym(PATHNAME_LIBC_FIXED, "je_mallctl", true, &cache);
 
     // libc++.so
-    sample_test_dlsym(PATHNAME_LIBCPP, "_ZNSt3__14cerrE", false);
-    sample_test_dlsym(PATHNAME_LIBCPP, "abort_message", true);
+    sample_test_dlsym(PATHNAME_LIBCPP, "_ZNSt3__14cerrE", false, &cache);
+    sample_test_dlsym(PATHNAME_LIBCPP, "abort_message", true, &cache);
+
+    // clean cache for xdl_addr()
+    xdl_addr_clean(&cache);
 }
 
 static JNINativeMethod sample_jni_methods[] = {

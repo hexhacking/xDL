@@ -25,7 +25,7 @@ ext {
     minSdkVersion = 16
     compileSdkVersion = 30
     targetSdkVersion = 30
-    buildToolsVersion = '30.0.2'
+    buildToolsVersion = "30.0.3"
     javaVersion = JavaVersion.VERSION_1_6
     ndkVersion = "21.3.6528147"
     cmakeVersion = "3.10.2"
@@ -34,7 +34,7 @@ ext {
 
     POM_GROUP_ID = "io.hexhacking.xdl"
     POM_ARTIFACT_ID = "xdl-android-lib"
-    POM_VERSION_NAME = "1.0.0"
+    POM_VERSION_NAME = "1.0.1"
 
     POM_NAME = "xDL Android Lib"
     POM_DESCRIPTION = "xDL is an enhanced implementation of the Android DL series functions."
