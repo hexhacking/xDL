@@ -1,4 +1,4 @@
-apply plugin: 'digital.wup.android-maven-publish'
+apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
 
 def readPropertyFromLocalProperties(String key) {
@@ -11,18 +11,6 @@ def readPropertyFromLocalProperties(String key) {
     return properties.getProperty(key)
 }
 
-def getCustomMavenRepo() {
-    return readPropertyFromLocalProperties('CUSTOM_MAVEN_REPO')
-}
-
-def getCustomMavenUsername() {
-    return readPropertyFromLocalProperties('CUSTOM_MAVEN_USERNAME')
-}
-
-def getCustomMavenPassword() {
-    return readPropertyFromLocalProperties('CUSTOM_MAVEN_PASSWORD')
-}
-
 def getBintrayUser() {
     return readPropertyFromLocalProperties('BINTRAY_USER')
 }
@@ -32,7 +20,7 @@ def getBintrayApikey() {
 }
 
 task sourcesJar(type: Jar) {
-    classifier = 'sources'
+    archiveClassifier.set("sources")
     from android.sourceSets.main.java.srcDirs
 }
 
@@ -42,64 +30,54 @@ task javadoc(type: Javadoc) {
 }
 
 task javadocJar(type: Jar, dependsOn: javadoc) {
-    classifier = 'javadoc'
+    archiveClassifier.set("javadoc")
     from javadoc.destinationDir
 }
 
-publishing.publications {
-    mavenAar(MavenPublication) {
-        from components.android
+project.afterEvaluate {
+    publishing.publications {
+        mavenAar(MavenPublication) {
+            from components.release
 
-        artifact sourcesJar
-        artifact javadocJar
+            artifact sourcesJar
+            artifact javadocJar
 
-        artifactId POM_ARTIFACT_ID
-        groupId POM_GROUP_ID
-        version POM_VERSION_NAME
+            artifactId POM_ARTIFACT_ID
+            groupId POM_GROUP_ID
+            version POM_VERSION_NAME
 
-        pom {
-            name = POM_NAME
-            description = POM_DESCRIPTION
-            url = POM_URL
-            inceptionYear = POM_INCEPTION_YEAR
-            packaging = POM_PACKAGING
-            scm {
-                connection = POM_SCM_CONNECTION
+            pom {
+                name = POM_NAME
+                description = POM_DESCRIPTION
                 url = POM_URL
-            }
-            issueManagement {
-                system = POM_ISSUE_SYSTEM
-                url = POM_ISSUE_URL
-            }
-            licenses {
-                license {
-                    name = POM_LICENCE_NAME
-                    url = POM_LICENCE_URL
-                    distribution = POM_LICENCE_DIST
+                inceptionYear = POM_INCEPTION_YEAR
+                packaging = POM_PACKAGING
+                scm {
+                    connection = POM_SCM_CONNECTION
+                    url = POM_URL
                 }
-            }
-            developers {
-                developer {
-                    id = POM_DEVELOPER_ID
-                    name = POM_DEVELOPER_NAME
+                issueManagement {
+                    system = POM_ISSUE_SYSTEM
+                    url = POM_ISSUE_URL
+                }
+                licenses {
+                    license {
+                        name = POM_LICENCE_NAME
+                        url = POM_LICENCE_URL
+                        distribution = POM_LICENCE_DIST
+                    }
+                }
+                developers {
+                    developer {
+                        id = POM_DEVELOPER_ID
+                        name = POM_DEVELOPER_NAME
+                    }
                 }
             }
         }
     }
 }
 
-// custom maven repo
-publishing.repositories {
-    maven {
-        url getCustomMavenRepo()
-        credentials {
-            username getCustomMavenUsername()
-            password getCustomMavenPassword()
-        }
-    }
-}
-
-// bintray maven repo
 bintray {
     user = getBintrayUser()
     key = getBintrayApikey()
