@@ -55,6 +55,20 @@ dependencies {
 apply from: "https://raw.githubusercontent.com/hexhacking/xDL/master/gradle/nativedeps.gradle"
 ```
 
+If your network is restricted, please try:
+
+```Gradle
+apply from: "https://gitlab.com/hexhacking/xDL/-/raw/master/gradle/nativedeps.gradle"
+```
+
+Or:
+
+```Gradle
+apply from: "https://gitee.com/hexhacking/xDL/raw/master/gradle/nativedeps.gradle"
+```
+
+Of course, you can also download this script and put it in your own project.
+
 `nativedeps.gradle` will download xDL header file and dynamic library to the `build` directory.
 
 ### 2. Add dependency in CMakeLists.txt or Android.mk

@@ -55,6 +55,20 @@ dependencies {
 apply from: "https://raw.githubusercontent.com/hexhacking/xDL/master/gradle/nativedeps.gradle"
 ```
 
+如果你的网络受到了限制，请试一试：
+
+```Gradle
+apply from: "https://gitlab.com/hexhacking/xDL/-/raw/master/gradle/nativedeps.gradle"
+```
+
+或者：
+
+```Gradle
+apply from: "https://gitee.com/hexhacking/xDL/raw/master/gradle/nativedeps.gradle"
+```
+
+当然，你也可以把这个脚本下载后放在你自己的工程里。
+
 `nativedeps.gradle` 将把 xDL 的头文件和动态库下载到 `build` 目录中。
 
 ### 2. 在 CMakeLists.txt 或 Android.mk 中增加依赖
