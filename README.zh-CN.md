@@ -125,6 +125,18 @@ android {
 }
 ```
 
+### 4. 打包时排除 libxdl.so (可选的)
+
+如果你是在一个 SDK 工程里使用 xDL，你可能需要避免把 libxdl.so 打包到你的 AAR 里，以免 app 工程打包时遇到重复的 libxdl.so 文件。
+
+```Gradle
+android {
+    packagingOptions {
+        exclude '**/libxdl.so'
+    }
+}
+```
+
 你可以参考 [xdl-sample](xdl_sample) 文件中的示例 app。
 
 

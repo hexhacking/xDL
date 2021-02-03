@@ -125,6 +125,18 @@ android {
 }
 ```
 
+### 4. Exclude libxdl.so when packaging (Optional)
+
+If you are using xDL in an SDK project, you may need to avoid packaging libxdl.so into your AAR, so as not to encounter duplicate libxdl.so file when packaging the app project.
+
+```Gradle
+android {
+    packagingOptions {
+        exclude '**/libxdl.so'
+    }
+}
+```
+
 There is a sample app in the [xdl-sample](xdl_sample) folder you can refer to.
 
 
