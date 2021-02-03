@@ -23,7 +23,7 @@ xDL 是 Android DL 系列函数的增强实现。
     * 在 Android 5.x 中，返回完整的路径名（full pathname），而不是文件名（basename）。
     * 返回 app\_process32 / app\_process64，而不是包名。
 * 支持 Android 4.1 - 11 (API level 16 - 30)。
-* 支持 armeabi-v7a, arm64-v8a, x86 and x86_64。
+* 支持 armeabi-v7a, arm64-v8a, x86 和 x86_64。
 * 使用 MIT 许可证授权。
 
 
