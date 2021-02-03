@@ -41,25 +41,65 @@ xDL 是 Android DL 系列函数的增强实现。
 
 ## 使用
 
-* 通过包含源码使用 xDL：
-
-```
-git submodule add https://github.com/hexhacking/xDL.git external/xdl
-```
-
-xDL 的源码在这个文件夹里：[xdl_lib/src/main/cpp](xdl_lib/src/main/cpp)
-
-* 或者，通过 gradle 依赖使用 xDL：
-
-### 1. 增加依赖
+### 1. 在 build.gradle 中增加依赖
 
 ```Gradle
-dependencies {
-    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.1'
+ext {
+    XDL_VERSION = '1.0.1'
 }
+
+dependencies {
+    implementation "io.hexhacking.xdl:xdl-android-lib:${XDL_VERSION}"
+}
+
+apply from: "https://raw.githubusercontent.com/hexhacking/xDL/master/gradle/nativedeps.gradle"
 ```
 
-### 2. 指定一个或多个你需要的 ABI
+`nativedeps.gradle` 将把 xDL 的头文件和动态库下载到 `build` 目录中。
+
+### 2. 在 CMakeLists.txt 或 Android.mk 中增加依赖
+
+> CMakeLists.txt
+
+```CMake
+# xDL base 路径 (你可能需要修改这个路径)
+set(XDL_BASE ${CMAKE_CURRENT_SOURCE_DIR}/../../../build/nativedeps/xdl)
+
+# 导入 xDL
+add_library(xdl SHARED IMPORTED)
+set_target_properties(xdl PROPERTIES
+        IMPORTED_LOCATION ${XDL_BASE}/aar/jni/${ANDROID_ABI}/libxdl.so
+        INTERFACE_INCLUDE_DIRECTORIES ${XDL_BASE}/header
+        )
+
+# 你的动态库
+add_library(mylib SHARED mylib.c)
+target_link_libraries(mylib xdl)
+```
+
+> Android.mk
+
+```
+# xDL base 路径 (你可能需要修改这个路径)
+LOCAL_PATH := $(call my-dir)
+XDL_BASE := $(LOCAL_PATH)/../../../build/nativedeps/xdl
+
+# 导入 xDL
+include $(CLEAR_VARS)
+LOCAL_MODULE            := xdl
+LOCAL_SRC_FILES         := $(XDL_BASE)/aar/jni/$(TARGET_ARCH_ABI)/libxdl.so
+LOCAL_EXPORT_C_INCLUDES := $(XDL_BASE)/header
+include $(PREBUILT_SHARED_LIBRARY)
+
+# 你的动态库
+include $(CLEAR_VARS)
+LOCAL_MODULE            := mylib
+LOCAL_SRC_FILES         := mylib.c
+LOCAL_SHARED_LIBRARIES  += xdl
+include $(BUILD_SHARED_LIBRARY)
+```
+
+### 3. 指定一个或多个你需要的 ABI
 
 ```Gradle
 android {
@@ -71,12 +111,6 @@ android {
 }
 ```
 
-### 3. 下载头文件
-
-从 [这里](xdl_lib/src/main/cpp/xdl.h) 下载头文件，从 [这里](https://dl.bintray.com/hexhacking/maven/io/hexhacking/xdl/xdl-android-lib/) 下载 AAR 并解压。
-
-把头文件和动态库放在你工程的合适位置，然后配置你的 CMakeLists.txt 或 Android.mk。
-
 你可以参考 [xdl-sample](xdl_sample) 文件中的示例 app。
 
 
@@ -84,13 +118,13 @@ android {
 
 包含 xDL 的头文件：
 
-```c
+```C
 #include "xdl.h"
 ```
 
 ### 1. `xdl_open()` 和 `xdl_close()`
 
-```c
+```C
 void *xdl_open(const char *filename);
 void  xdl_close(void *handle);
 ```
@@ -116,7 +150,7 @@ void  xdl_close(void *handle);
 
 ### 2. `xdl_sym()` 和 `xdl_dsym()`
 
-```c
+```C
 void *xdl_sym(void *handle, const char *symbol);
 void *xdl_dsym(void *handle, const char *symbol);
 ```
@@ -135,7 +169,7 @@ void *xdl_dsym(void *handle, const char *symbol);
 
 ### 3. `xdl_addr()`
 
-```c
+```C
 int xdl_addr(void *addr, Dl_info *info, void **cache);
 void xdl_addr_clean(void **cache);
 ```
@@ -145,7 +179,7 @@ void xdl_addr_clean(void **cache);
 * `xdl_addr()` 不仅能查询动态链接符号，还能查询调试符号。
 * `xdl_addr()` 需要传递一个附加的参数（cache），其中会缓存 `xdl_addr()` 执行过程中打开的 ELF handle，缓存的目的是使后续对同一个 ELF 的 `xdl_addr()` 执行的更快。当不需要再执行 `xdl_addr()` 时，请使用 `xdl_addr_clean()` 清除缓存。举例：
 
-```c
+```C
 void *cache = NULL;
 Dl_info info;
 xdl_addr(addr_1, &info, &cache);
@@ -156,7 +190,7 @@ xdl_addr_clean(&cache);
 
 ### 4. `xdl_iterate_phdr()`
 
-```c
+```C
 #define XDL_DEFAULT       0x00
 #define XDL_WITH_LINKER   0x01
 #define XDL_FULL_PATHNAME 0x02

@@ -41,25 +41,65 @@ If xDL is compiled into an independent dynamic library:
 
 ## Usage
 
-* Use xDL by including the source code:
-
-```
-git submodule add https://github.com/hexhacking/xDL.git external/xdl
-```
-
-The source code of xDL is in this folder: [xdl_lib/src/main/cpp](xdl_lib/src/main/cpp)
-
-* Or, use xDL via gradle dependency:
-
-### 1. Add dependency
+### 1. Add dependency in build.gradle
 
 ```Gradle
-dependencies {
-    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.1'
+ext {
+    XDL_VERSION = '1.0.1'
 }
+
+dependencies {
+    implementation "io.hexhacking.xdl:xdl-android-lib:${XDL_VERSION}"
+}
+
+apply from: "https://raw.githubusercontent.com/hexhacking/xDL/master/gradle/nativedeps.gradle"
 ```
 
-### 2. Specify one or more ABI(s) you need
+`nativedeps.gradle` will download xDL header file and dynamic library to the `build` directory.
+
+### 2. Add dependency in CMakeLists.txt or Android.mk
+
+> CMakeLists.txt
+
+```CMake
+# xDL base path (you may need to modify this path)
+set(XDL_BASE ${CMAKE_CURRENT_SOURCE_DIR}/../../../build/nativedeps/xdl)
+
+# import xDL
+add_library(xdl SHARED IMPORTED)
+set_target_properties(xdl PROPERTIES
+        IMPORTED_LOCATION ${XDL_BASE}/aar/jni/${ANDROID_ABI}/libxdl.so
+        INTERFACE_INCLUDE_DIRECTORIES ${XDL_BASE}/header
+        )
+
+# your library
+add_library(mylib SHARED mylib.c)
+target_link_libraries(mylib xdl)
+```
+
+> Android.mk
+
+```
+# xDL base path (you may need to modify this path)
+LOCAL_PATH := $(call my-dir)
+XDL_BASE := $(LOCAL_PATH)/../../../build/nativedeps/xdl
+
+# import xDL
+include $(CLEAR_VARS)
+LOCAL_MODULE            := xdl
+LOCAL_SRC_FILES         := $(XDL_BASE)/aar/jni/$(TARGET_ARCH_ABI)/libxdl.so
+LOCAL_EXPORT_C_INCLUDES := $(XDL_BASE)/header
+include $(PREBUILT_SHARED_LIBRARY)
+
+# your library
+include $(CLEAR_VARS)
+LOCAL_MODULE            := mylib
+LOCAL_SRC_FILES         := mylib.c
+LOCAL_SHARED_LIBRARIES  += xdl
+include $(BUILD_SHARED_LIBRARY)
+```
+
+### 3. Specify one or more ABI(s) you need
 
 ```Gradle
 android {
@@ -71,12 +111,6 @@ android {
 }
 ```
 
-### 3. Download Header File and Dynamic Libraries
-
-Download the header file from [here](xdl_lib/src/main/cpp/xdl.h), download AAR from [here](https://dl.bintray.com/hexhacking/maven/io/hexhacking/xdl/xdl-android-lib/) and unzip it.
-
-Put the header file and dynamic libraries in the right place of your project. Then configure your CMakeLists.txt or Android.mk.
-
 There is a sample app in the [xdl-sample](xdl_sample) folder you can refer to.
 
 
@@ -84,13 +118,13 @@ There is a sample app in the [xdl-sample](xdl_sample) folder you can refer to.
 
 include xDL's header file:
 
-```c
+```C
 #include "xdl.h"
 ```
 
 ### 1. `xdl_open()` and `xdl_close()`
 
-```c
+```C
 void *xdl_open(const char *filename);
 void  xdl_close(void *handle);
 ```
@@ -116,7 +150,7 @@ They are very similar to `dlopen()` and `dlclose()`. But need to pay attention: 
 
 ### 2. `xdl_sym()` and `xdl_dsym()`
 
-```c
+```C
 void *xdl_sym(void *handle, const char *symbol);
 void *xdl_dsym(void *handle, const char *symbol);
 ```
@@ -135,7 +169,7 @@ Notice:
 
 ### 3. `xdl_addr()`
 
-```c
+```C
 int xdl_addr(void *addr, Dl_info *info, void **cache);
 void xdl_addr_clean(void **cache);
 ```
@@ -145,7 +179,7 @@ void xdl_addr_clean(void **cache);
 * `xdl_addr()` can lookup not only dynamic link symbols, but also debugging symbols. 
 * `xdl_addr()` needs to pass an additional parameter (cache), which will cache the ELF handle opened during the execution of `xdl_addr()`. The purpose of caching is to make subsequent executions of `xdl_addr()` of the same ELF faster. When you do not need to execute `xdl_addr()`, please use `xdl_addr_clean()` to clear the cache. For example:
 
-```c
+```C
 void *cache = NULL;
 Dl_info info;
 xdl_addr(addr_1, &info, &cache);
@@ -156,7 +190,7 @@ xdl_addr_clean(&cache);
 
 ### 4. `xdl_iterate_phdr()`
 
-```c
+```C
 #define XDL_DEFAULT       0x00
 #define XDL_WITH_LINKER   0x01
 #define XDL_FULL_PATHNAME 0x02

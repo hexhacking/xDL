@@ -6,15 +6,22 @@ add_compile_options(
         -Werror)
 
 string(TOLOWER ${CMAKE_BUILD_TYPE} BUILD_TYPE_DIRNAME)
-link_directories(
-        ../../../../xdl_lib/build/intermediates/stripped_native_libs/${BUILD_TYPE_DIRNAME}/out/lib/${ANDROID_ABI}
-)
+set(XDL_BASE ${CMAKE_CURRENT_SOURCE_DIR}/../../../../xdl_lib)
+add_library(xdl SHARED IMPORTED)
+set_target_properties(xdl PROPERTIES
+        IMPORTED_LOCATION ${XDL_BASE}/build/intermediates/stripped_native_libs/${BUILD_TYPE_DIRNAME}/out/lib/${ANDROID_ABI}/libxdl.so
+        INTERFACE_INCLUDE_DIRECTORIES ${XDL_BASE}/src/main/cpp
+        )
+
+#set(XDL_BASE ${CMAKE_CURRENT_SOURCE_DIR}/../../../build/nativedeps/xdl)
+#add_library(xdl SHARED IMPORTED)
+#set_target_properties(xdl PROPERTIES
+#        IMPORTED_LOCATION ${XDL_BASE}/aar/jni/${ANDROID_ABI}/libxdl.so
+#        INTERFACE_INCLUDE_DIRECTORIES ${XDL_BASE}/header
+#        )
 
 add_library(sample SHARED
         sample.c)
-
-target_include_directories(sample PUBLIC
-        ../../../../xdl_lib/src/main/cpp)
 
 target_link_libraries(sample
         xdl

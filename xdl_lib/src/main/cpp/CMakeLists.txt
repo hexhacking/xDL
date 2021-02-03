@@ -14,9 +14,6 @@ add_library(xdl SHARED
 target_include_directories(xdl PUBLIC
         .)
 
-target_link_libraries(xdl
-        dl)
-
 if(USEASAN)
 
 target_compile_options(xdl PUBLIC

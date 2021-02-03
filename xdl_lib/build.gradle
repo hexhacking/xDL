@@ -37,4 +37,8 @@ android {
     }
 }
 
+ext {
+    EXPORTED_NATIVE_HEADERS = ['src/main/cpp/xdl.h']
+}
+
 apply from: rootProject.file('gradle/publish.gradle')
