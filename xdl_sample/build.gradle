@@ -4,7 +4,6 @@ android {
     compileSdkVersion rootProject.ext.compileSdkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     ndkVersion rootProject.ext.ndkVersion
-
     defaultConfig {
         applicationId "io.hexhacking.xdl.sample"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -15,7 +14,6 @@ android {
             abiFilters rootProject.ext.abiFilters.split(",")
         }
     }
-
     externalNativeBuild {
         cmake {
             path "src/main/cpp/CMakeLists.txt"
@@ -25,12 +23,10 @@ android {
 //            path "src/main/cpp/Android.mk"
 //        }
     }
-
     compileOptions {
         sourceCompatibility rootProject.ext.javaVersion
         targetCompatibility rootProject.ext.javaVersion
     }
-
     buildTypes {
         debug {
             minifyEnabled false
@@ -39,21 +35,21 @@ android {
             minifyEnabled false
         }
     }
+    buildFeatures {
+        prefab true
+    }
+    packagingOptions {
+        pickFirst '**/libxdl.so'
+    }
 }
-
-//ext {
-//    XDL_VERSION = '1.0.1'
-//}
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.2.0'
     implementation 'com.google.android.material:material:1.2.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
 
-    implementation project(':xdl_lib')
-    //implementation "io.hexhacking.xdl:xdl-android-lib:${XDL_VERSION}"
+    implementation project(':xdl')
+//    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.2'
 }
 
 apply from: rootProject.file('gradle/sanitizer.gradle')
-//apply from: rootProject.file('gradle/nativedeps.gradle')
-//apply from: "https://raw.githubusercontent.com/hexhacking/xDL/master/gradle/nativedeps.gradle"

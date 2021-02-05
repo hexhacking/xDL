@@ -22,7 +22,7 @@
 // Created by caikelun on 2020-10-04.
 
 //
-// xDL version: 1.0.1
+// xDL version: 1.0.2
 //
 // You can always get the latest version from:
 // https://github.com/hexhacking/xDL

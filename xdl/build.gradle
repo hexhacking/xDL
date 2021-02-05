@@ -10,6 +10,7 @@ android {
         externalNativeBuild {
             cmake {
                 abiFilters rootProject.ext.abiFilters.split(",")
+                arguments "-DANDROID_STL=none"
                 if(rootProject.ext.useASAN) {
                     arguments "-DANDROID_ARM_MODE=arm"
                     arguments "-DUSEASAN=ON"
@@ -35,10 +36,14 @@ android {
             minifyEnabled false
         }
     }
-}
-
-ext {
-    EXPORTED_NATIVE_HEADERS = ['src/main/cpp/xdl.h']
+    buildFeatures {
+        prefabPublishing true
+    }
+    prefab {
+        xdl {
+            headers "src/main/cpp/include"
+        }
+    }
 }
 
 apply from: rootProject.file('gradle/publish.gradle')

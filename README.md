@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.0.1-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.0.2-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2011-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -41,76 +41,45 @@ If xDL is compiled into an independent dynamic library:
 
 ## Usage
 
+xDL uses [Prefab](https://google.github.io/prefab/) package format, which is supported by Android Gradle Plugin 4.0+.
+
+More information: [Using native dependencies](https://developer.android.com/studio/build/native-dependencies)
+
 ### 1. Add dependency in build.gradle
 
 ```Gradle
-ext {
-    XDL_VERSION = '1.0.1'
+android {
+    buildFeatures {
+        prefab true
+    }
 }
 
 dependencies {
-    implementation "io.hexhacking.xdl:xdl-android-lib:${XDL_VERSION}"
+    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.2'
 }
-
-apply from: "https://raw.githubusercontent.com/hexhacking/xDL/master/gradle/nativedeps.gradle"
 ```
-
-If your network is restricted, please try:
-
-```Gradle
-apply from: "https://gitlab.com/hexhacking/xDL/-/raw/master/gradle/nativedeps.gradle"
-```
-
-Or:
-
-```Gradle
-apply from: "https://gitee.com/hexhacking/xDL/raw/master/gradle/nativedeps.gradle"
-```
-
-Of course, you can also download this script and put it in your own project.
-
-`nativedeps.gradle` will download xDL header file and dynamic library to the `build` directory.
 
 ### 2. Add dependency in CMakeLists.txt or Android.mk
 
 > CMakeLists.txt
 
 ```CMake
-# xDL base path (you may need to modify this path)
-set(XDL_BASE ${CMAKE_CURRENT_SOURCE_DIR}/../../../build/nativedeps/xdl)
+find_package(xdl REQUIRED CONFIG)
 
-# import xDL
-add_library(xdl SHARED IMPORTED)
-set_target_properties(xdl PROPERTIES
-        IMPORTED_LOCATION ${XDL_BASE}/aar/jni/${ANDROID_ABI}/libxdl.so
-        INTERFACE_INCLUDE_DIRECTORIES ${XDL_BASE}/header
-        )
-
-# your library
 add_library(mylib SHARED mylib.c)
-target_link_libraries(mylib xdl)
+target_link_libraries(mylib xdl::xdl)
 ```
 
 > Android.mk
 
 ```
-# xDL base path (you may need to modify this path)
-LOCAL_PATH := $(call my-dir)
-XDL_BASE := $(LOCAL_PATH)/../../../build/nativedeps/xdl
-
-# import xDL
 include $(CLEAR_VARS)
-LOCAL_MODULE            := xdl
-LOCAL_SRC_FILES         := $(XDL_BASE)/aar/jni/$(TARGET_ARCH_ABI)/libxdl.so
-LOCAL_EXPORT_C_INCLUDES := $(XDL_BASE)/header
-include $(PREBUILT_SHARED_LIBRARY)
-
-# your library
-include $(CLEAR_VARS)
-LOCAL_MODULE            := mylib
-LOCAL_SRC_FILES         := mylib.c
-LOCAL_SHARED_LIBRARIES  += xdl
+LOCAL_MODULE           := mylib
+LOCAL_SRC_FILES        := mylib.c
+LOCAL_SHARED_LIBRARIES += xdl
 include $(BUILD_SHARED_LIBRARY)
+
+$(call import-module,prefab/xdl)
 ```
 
 ### 3. Specify one or more ABI(s) you need
@@ -125,7 +94,7 @@ android {
 }
 ```
 
-### 4. Exclude libxdl.so when packaging (Optional)
+### 4. Add packaging options
 
 If you are using xDL in an SDK project, you may need to avoid packaging libxdl.so into your AAR, so as not to encounter duplicate libxdl.so file when packaging the app project.
 
@@ -137,12 +106,20 @@ android {
 }
 ```
 
+On the other hand, if you are using xDL in an APP project, you may need to add some options to deal with conflicts caused by duplicate libxdl.so file.
+
+```Gradle
+android {
+    packagingOptions {
+        pickFirst '**/libxdl.so'
+    }
+}
+```
+
 There is a sample app in the [xdl-sample](xdl_sample) folder you can refer to.
 
 
 ## API
-
-include xDL's header file:
 
 ```C
 #include "xdl.h"

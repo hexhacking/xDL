@@ -34,16 +34,6 @@ task javadocJar(type: Jar, dependsOn: javadoc) {
     from javadoc.destinationDir
 }
 
-task nativesymbolZip(type: Zip, dependsOn: 'build') {
-    archiveClassifier.set("native-symbol")
-    from file("build/intermediates/cmake/release/obj/")
-}
-
-task nativeheaderZip(type: Zip) {
-    archiveClassifier.set("native-header")
-    EXPORTED_NATIVE_HEADERS.each { from file(it) }
-}
-
 project.afterEvaluate {
     publishing.publications {
         mavenAar(MavenPublication) {
@@ -51,8 +41,6 @@ project.afterEvaluate {
 
             artifact sourcesJar
             artifact javadocJar
-            artifact nativesymbolZip
-            artifact nativeheaderZip
 
             artifactId POM_ARTIFACT_ID
             groupId POM_GROUP_ID

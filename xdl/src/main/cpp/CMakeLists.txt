@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.10.2)
 
 add_compile_options(
         -std=c11
@@ -12,6 +12,7 @@ add_library(xdl SHARED
         ${XDL_SRC})
 
 target_include_directories(xdl PUBLIC
+        include
         .)
 
 if(USEASAN)

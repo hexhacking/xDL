@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.0.1-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.0.2-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2011-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -41,76 +41,45 @@ xDL 是 Android DL 系列函数的增强实现。
 
 ## 使用
 
+xDL 使用从 Android Gradle Plugin 4.0+ 开始支持的 [Prefab](https://google.github.io/prefab/) 包格式。
+
+更多信息: [使用 native 依赖项](https://developer.android.com/studio/build/native-dependencies)
+
 ### 1. 在 build.gradle 中增加依赖
 
 ```Gradle
-ext {
-    XDL_VERSION = '1.0.1'
+android {
+    buildFeatures {
+        prefab true
+    }
 }
 
 dependencies {
-    implementation "io.hexhacking.xdl:xdl-android-lib:${XDL_VERSION}"
+    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.2'
 }
-
-apply from: "https://raw.githubusercontent.com/hexhacking/xDL/master/gradle/nativedeps.gradle"
 ```
-
-如果你的网络受到了限制，请试一试：
-
-```Gradle
-apply from: "https://gitlab.com/hexhacking/xDL/-/raw/master/gradle/nativedeps.gradle"
-```
-
-或者：
-
-```Gradle
-apply from: "https://gitee.com/hexhacking/xDL/raw/master/gradle/nativedeps.gradle"
-```
-
-当然，你也可以把这个脚本下载后放在你自己的工程里。
-
-`nativedeps.gradle` 将把 xDL 的头文件和动态库下载到 `build` 目录中。
 
 ### 2. 在 CMakeLists.txt 或 Android.mk 中增加依赖
 
 > CMakeLists.txt
 
 ```CMake
-# xDL base 路径 (你可能需要修改这个路径)
-set(XDL_BASE ${CMAKE_CURRENT_SOURCE_DIR}/../../../build/nativedeps/xdl)
+find_package(xdl REQUIRED CONFIG)
 
-# 导入 xDL
-add_library(xdl SHARED IMPORTED)
-set_target_properties(xdl PROPERTIES
-        IMPORTED_LOCATION ${XDL_BASE}/aar/jni/${ANDROID_ABI}/libxdl.so
-        INTERFACE_INCLUDE_DIRECTORIES ${XDL_BASE}/header
-        )
-
-# 你的动态库
 add_library(mylib SHARED mylib.c)
-target_link_libraries(mylib xdl)
+target_link_libraries(mylib xdl::xdl)
 ```
 
 > Android.mk
 
 ```
-# xDL base 路径 (你可能需要修改这个路径)
-LOCAL_PATH := $(call my-dir)
-XDL_BASE := $(LOCAL_PATH)/../../../build/nativedeps/xdl
-
-# 导入 xDL
 include $(CLEAR_VARS)
-LOCAL_MODULE            := xdl
-LOCAL_SRC_FILES         := $(XDL_BASE)/aar/jni/$(TARGET_ARCH_ABI)/libxdl.so
-LOCAL_EXPORT_C_INCLUDES := $(XDL_BASE)/header
-include $(PREBUILT_SHARED_LIBRARY)
-
-# 你的动态库
-include $(CLEAR_VARS)
-LOCAL_MODULE            := mylib
-LOCAL_SRC_FILES         := mylib.c
-LOCAL_SHARED_LIBRARIES  += xdl
+LOCAL_MODULE           := mylib
+LOCAL_SRC_FILES        := mylib.c
+LOCAL_SHARED_LIBRARIES += xdl
 include $(BUILD_SHARED_LIBRARY)
+
+$(call import-module,prefab/xdl)
 ```
 
 ### 3. 指定一个或多个你需要的 ABI
@@ -125,7 +94,7 @@ android {
 }
 ```
 
-### 4. 打包时排除 libxdl.so (可选的)
+### 4. 增加打包选项
 
 如果你是在一个 SDK 工程里使用 xDL，你可能需要避免把 libxdl.so 打包到你的 AAR 里，以免 app 工程打包时遇到重复的 libxdl.so 文件。
 
@@ -137,12 +106,20 @@ android {
 }
 ```
 
+另一方便, 如果你是在一个 APP 工程里使用 xDL，你可以需要增加一些选项，用来处理重复的 libxdl.so 文件引起的冲突。
+
+```Gradle
+android {
+    packagingOptions {
+        pickFirst '**/libxdl.so'
+    }
+}
+```
+
 你可以参考 [xdl-sample](xdl_sample) 文件中的示例 app。
 
 
 ## API
-
-包含 xDL 的头文件：
 
 ```C
 #include "xdl.h"
