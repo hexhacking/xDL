@@ -116,7 +116,7 @@ android {
 }
 ```
 
-你可以参考 [xdl-sample](xdl_sample) 文件中的示例 app。
+你可以参考 [xdl-sample](xdl_sample) 文件夹中的示例 app。
 
 
 ## API
