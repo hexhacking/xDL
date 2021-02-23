@@ -31,7 +31,6 @@
 #include <stdio.h>
 #include <android/api-level.h>
 #include "xdl_util.h"
-#include "xdl_const.h"
 
 bool xdl_util_starts_with(const char *str, const char *start)
 {

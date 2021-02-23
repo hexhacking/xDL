@@ -5,7 +5,6 @@ buildscript {
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:4.1.2'
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
     }
 }
 
@@ -13,6 +12,7 @@ allprojects {
     repositories {
 //        mavenLocal()
         google()
+        mavenCentral()
         jcenter()
     }
 }
@@ -32,9 +32,9 @@ ext {
     abiFilters = "armeabi-v7a,arm64-v8a,x86,x86_64"
     useASAN = false
 
-    POM_GROUP_ID = "io.hexhacking.xdl"
-    POM_ARTIFACT_ID = "xdl-android-lib"
-    POM_VERSION_NAME = "1.0.2"
+    POM_GROUP_ID = "io.hexhacking"
+    POM_ARTIFACT_ID = "xdl"
+    POM_VERSION_NAME = "1.0.4"
 
     POM_NAME = "xDL Android Lib"
     POM_DESCRIPTION = "xDL is an enhanced implementation of the Android DL series functions."
@@ -53,8 +53,4 @@ ext {
 
     POM_DEVELOPER_ID = "HexHacking"
     POM_DEVELOPER_NAME = "HexHacking Team"
-
-    BINTRAY_REPO = "maven"
-    BINTRAY_ORGANIZATION = "hexhacking"
-    BINTRAY_LICENCE = ['MIT']
 }

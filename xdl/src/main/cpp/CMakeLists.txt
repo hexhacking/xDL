@@ -15,6 +15,9 @@ target_include_directories(xdl PUBLIC
         include
         .)
 
+#target_link_libraries(xdl
+#        log)
+
 if(USEASAN)
 
 target_compile_options(xdl PUBLIC

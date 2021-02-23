@@ -34,8 +34,8 @@
 #include <android/api-level.h>
 #include "xdl_iterate.h"
 #include "xdl.h"
+#include "xdl_linker.h"
 #include "xdl_util.h"
-#include "xdl_const.h"
 
 /*
  * =========================================================================================================
@@ -59,20 +59,14 @@
  * =========================================================================================================
  */
 
+// we only use this when Android < 8.1
+#ifndef __LP64__
+#define XDL_ITERATE_LINKER_PATHNAME "/system/bin/linker"
+#else
+#define XDL_ITERATE_LINKER_PATHNAME "/system/bin/linker64"
+#endif
+
 extern __attribute((weak)) int dl_iterate_phdr(int (*)(struct dl_phdr_info *, size_t, void *), void *);
-
-// Android 5.0/5.1 linker's global mutex in .symtab
-static pthread_mutex_t *xdl_iterate_linker_mutex = NULL;
-
-static void xdl_iterate_linker_mutex_init()
-{
-    void *linker = xdl_open(XDL_CONST_PATHNAME_LINKER);
-    if(NULL == linker) return;
-
-    xdl_iterate_linker_mutex = xdl_dsym(linker, XDL_CONST_SYM_LINKER_MUTEX);
-
-    xdl_close(linker);
-}
 
 static uintptr_t xdl_iterate_get_min_vaddr(struct dl_phdr_info *info)
 {
@@ -182,7 +176,7 @@ static uintptr_t xdl_iterate_find_linker_base(FILE **maps)
     // open or rewind maps-file
     if(0 != xdl_iterate_open_or_rewind_maps(maps)) return 0; // failed
 
-    size_t linker_pathname_len = strlen(" "XDL_CONST_PATHNAME_LINKER);
+    size_t linker_pathname_len = strlen(" "XDL_ITERATE_LINKER_PATHNAME);
 
     char line[1024];
     while(fgets(line, sizeof(line), *maps))
@@ -190,7 +184,7 @@ static uintptr_t xdl_iterate_find_linker_base(FILE **maps)
         // check pathname
         size_t line_len = xdl_util_trim_ending(line);
         if(line_len < linker_pathname_len)continue;
-        if(0 != memcmp(line + line_len - linker_pathname_len, " "XDL_CONST_PATHNAME_LINKER, linker_pathname_len)) continue;
+        if(0 != memcmp(line + line_len - linker_pathname_len, " "XDL_ITERATE_LINKER_PATHNAME, linker_pathname_len)) continue;
 
         // get base address
         uintptr_t base, offset;
@@ -225,29 +219,31 @@ static int xdl_iterate_do_callback(xdl_iterate_phdr_cb_t cb, void *cb_arg, uintp
 
 static int xdl_iterate_by_linker(xdl_iterate_phdr_cb_t cb, void *cb_arg, int flags)
 {
-    if(NULL == dl_iterate_phdr) return -1;
+    if(NULL == dl_iterate_phdr) return 0;
 
+    int api_level = xdl_util_get_api_level();
     FILE *maps = NULL;
+    int r;
 
     // for linker/linker64 in Android version < 8.1 (API level 27)
     uintptr_t linker_base = 0, linker_load_bias = 0;
-    if((flags & XDL_WITH_LINKER) && xdl_util_get_api_level() < __ANDROID_API_O_MR1__)
+    if((flags & XDL_WITH_LINKER) && api_level < __ANDROID_API_O_MR1__)
     {
         linker_base = xdl_iterate_find_linker_base(&maps);
         if(0 != linker_base)
         {
-            if(0 != xdl_iterate_do_callback(cb, cb_arg, linker_base, XDL_CONST_PATHNAME_LINKER, &linker_load_bias)) return 0;
+            if(0 != (r = xdl_iterate_do_callback(cb, cb_arg, linker_base, XDL_ITERATE_LINKER_PATHNAME, &linker_load_bias))) return r;
         }
     }
 
     // for other ELF
     uintptr_t pkg[5] = {(uintptr_t)cb, (uintptr_t)cb_arg, (uintptr_t)&maps, linker_load_bias, (uintptr_t)flags};
-    if(NULL != xdl_iterate_linker_mutex) pthread_mutex_lock(xdl_iterate_linker_mutex);
-    dl_iterate_phdr(xdl_iterate_by_linker_cb, pkg);
-    if(NULL != xdl_iterate_linker_mutex) pthread_mutex_unlock(xdl_iterate_linker_mutex);
+    if(__ANDROID_API_L__ == api_level || __ANDROID_API_L_MR1__ == api_level) xdl_linker_lock();
+    r = dl_iterate_phdr(xdl_iterate_by_linker_cb, pkg);
+    if(__ANDROID_API_L__ == api_level || __ANDROID_API_L_MR1__ == api_level) xdl_linker_unlock();
 
     if(NULL != maps) fclose(maps);
-    return 0;
+    return r;
 }
 
 #if defined(__arm__) || defined(__i386__)
@@ -256,6 +252,7 @@ static int xdl_iterate_by_maps(xdl_iterate_phdr_cb_t cb, void *cb_arg)
     FILE *maps = fopen("/proc/self/maps", "r");
     if(NULL == maps) return 0;
 
+    int r = 0;
     char line[1024];
     while(fgets(line, sizeof(line), maps))
     {
@@ -267,36 +264,23 @@ static int xdl_iterate_by_maps(xdl_iterate_phdr_cb_t cb, void *cb_arg)
 
         // get pathname
         char *pathname = strchr(line, '/');
-        if(NULL == pathname) break;
+        if(NULL == pathname) continue;
         xdl_util_trim_ending(pathname);
 
         // callback
-        if(0 != xdl_iterate_do_callback(cb, cb_arg, base, pathname, NULL)) break;
+        if(0 != (r = xdl_iterate_do_callback(cb, cb_arg, base, pathname, NULL))) break;
     }
 
     fclose(maps);
-    return 0;
+    return r;
 }
 #endif
 
 int xdl_iterate_phdr_impl(xdl_iterate_phdr_cb_t cb, void *cb_arg, int flags)
 {
-    int api_level = xdl_util_get_api_level();
-
-    // get linker's __dl__ZL10g_dl_mutex for Android 5.0/5.1
-    static bool linker_mutex_inited = false;
-    if(__ANDROID_API_L__ == api_level || __ANDROID_API_L_MR1__ == api_level)
-    {
-        if(!linker_mutex_inited)
-        {
-            linker_mutex_inited = true;
-            xdl_iterate_linker_mutex_init();
-        }
-    }
-
     // iterate by /proc/self/maps in Android 4.x (Android 4.x only supports arm32 and x86)
 #if defined(__arm__) || defined(__i386__)
-    if(api_level < __ANDROID_API_L__)
+    if(xdl_util_get_api_level() < __ANDROID_API_L__)
         return xdl_iterate_by_maps(cb, cb_arg);
 #endif
 

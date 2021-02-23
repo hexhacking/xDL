@@ -17,7 +17,7 @@
 // log
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
-#define LOG(fmt, ...) __android_log_print(ANDROID_LOG_DEBUG, "xdl_tag", fmt, ##__VA_ARGS__)
+#define LOG(fmt, ...) __android_log_print(ANDROID_LOG_INFO, "xdl_tag", fmt, ##__VA_ARGS__)
 #pragma clang diagnostic pop
 #define LOG_END "*** --------------------------------------------------------------"
 
@@ -32,6 +32,8 @@
 #define PATHNAME_LIBC_Q   "/apex/com.android.runtime/lib/bionic/libc.so"
 #define PATHNAME_LIBCPP   "/system/lib/libc++.so"
 #endif
+#define BASENAME_LIBNETUTILS "libnetutils.so"
+#define BASENAME_LIBCAP      "libcap.so"
 
 #define PATHNAME_LIBC_FIXED (android_get_device_api_level() < __ANDROID_API_Q__ ? PATHNAME_LIBC : PATHNAME_LIBC_Q)
 
@@ -67,22 +69,27 @@ static void sample_test_iterate(void)
     usleep(100 * 1000);
 }
 
-static void sample_test_dlsym(const char *filename, const char *symbol, bool debug_symbol, void **cache)
+static void *sample_test_dlsym(const char *filename, const char *symbol, bool debug_symbol, void **cache, bool dlopen_check)
 {
+    if(dlopen_check)
+    {
+        void *linker_handle = dlopen(filename, RTLD_NOW);
+        LOG("--- dlopen(%s) : handle %"PRIxPTR, filename, (uintptr_t)linker_handle);
+        if(NULL != linker_handle) dlclose(linker_handle);
+    }
+
     LOG("+++ xdl_open + %s + xdl_addr", debug_symbol ? "xdl_dsym" : "xdl_sym");
 
     // xdl_open
-    void *symbol_addr = NULL;
     void *handle = xdl_open(filename);
     LOG(">>> xdl_open(%s) : handle %"PRIxPTR, filename, (uintptr_t)handle);
 
     // xdl_dsym / xdl_sym
-    if(NULL != handle)
-    {
-        symbol_addr = (debug_symbol ? xdl_dsym : xdl_sym)(handle, symbol);
-        xdl_close(handle);
-    }
+    void *symbol_addr = (debug_symbol ? xdl_dsym : xdl_sym)(handle, symbol);
     LOG(">>> %s(%s) : addr %"PRIxPTR, debug_symbol ? "xdl_dsym" : "xdl_sym", symbol, (uintptr_t)symbol_addr);
+
+    // xdl_close
+    void *linker_handle = xdl_close(handle);
 
     // xdl_addr
     Dl_info info;
@@ -94,6 +101,8 @@ static void sample_test_dlsym(const char *filename, const char *symbol, bool deb
             (uintptr_t)info.dli_saddr, (NULL == info.dli_sname ? "(NULL)" : info.dli_sname));
 
     LOG(LOG_END);
+
+    return linker_handle;
 }
 
 static void sample_test(JNIEnv *env, jobject thiz)
@@ -104,22 +113,40 @@ static void sample_test(JNIEnv *env, jobject thiz)
     // cache for xdl_addr()
     void *cache = NULL;
 
-    // iterate
+    // iterate test
     sample_test_iterate();
 
     // linker
-    sample_test_dlsym(BASENAME_LINKER, "__dl__ZL10g_dl_mutex", true, &cache);
+    sample_test_dlsym(BASENAME_LINKER, "__dl__ZL10g_dl_mutex", true, &cache, false);
 
     // libc.so
-    sample_test_dlsym(PATHNAME_LIBC_FIXED, "android_set_abort_message", false, &cache);
-    sample_test_dlsym(PATHNAME_LIBC_FIXED, "je_mallctl", true, &cache);
+    sample_test_dlsym(PATHNAME_LIBC_FIXED, "android_set_abort_message", false, &cache, false);
+    sample_test_dlsym(PATHNAME_LIBC_FIXED, "je_mallctl", true, &cache, false);
 
     // libc++.so
-    sample_test_dlsym(PATHNAME_LIBCPP, "_ZNSt3__14cerrE", false, &cache);
-    sample_test_dlsym(PATHNAME_LIBCPP, "abort_message", true, &cache);
+    sample_test_dlsym(PATHNAME_LIBCPP, "_ZNSt3__14cerrE", false, &cache, false);
+    sample_test_dlsym(PATHNAME_LIBCPP, "abort_message", true, &cache, false);
+
+    // libnetutils.so (may need to be loaded from disk into memory)
+    void *linker_handle_libnetutils = sample_test_dlsym(BASENAME_LIBNETUTILS, "ifc_get_hwaddr", false, &cache, true);
+
+    // libcap.so (may need to be loaded from disk into memory)
+    void *linker_handle_libcap = sample_test_dlsym(BASENAME_LIBCAP, "cap_dup", false, &cache, true);
 
     // clean cache for xdl_addr()
     xdl_addr_clean(&cache);
+
+    // dlclose (may need to be unloaded from memory)
+    if(NULL != linker_handle_libnetutils)
+    {
+        LOG("--- dlclose(%s) : linker_handle %"PRIxPTR, BASENAME_LIBNETUTILS, (uintptr_t)linker_handle_libnetutils);
+        dlclose(linker_handle_libnetutils);
+    }
+    if(NULL != linker_handle_libcap)
+    {
+        LOG("--- dlclose(%s) : linker_handle %"PRIxPTR, BASENAME_LIBCAP, (uintptr_t)linker_handle_libcap);
+        dlclose(linker_handle_libcap);
+    }
 }
 
 static JNINativeMethod sample_jni_methods[] = {

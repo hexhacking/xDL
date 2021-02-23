@@ -41,7 +41,13 @@
 #include "xdl_iterate.h"
 #include "xdl_util.h"
 #include "xdl_lzma.h"
-#include "xdl_const.h"
+#include "xdl_linker.h"
+
+#ifndef __LP64__
+#define XDL_LINKER_BASENAME "linker"
+#else
+#define XDL_LINKER_BASENAME "linker64"
+#endif
 
 #define XDL_DYNSYM_IS_EXPORT_SYM(shndx) (SHN_UNDEF != (shndx))
 #define XDL_SYMTAB_IS_EXPORT_SYM(shndx) (SHN_UNDEF != (shndx) && !((shndx) >= SHN_LORESERVE && (shndx) <= SHN_HIRESERVE))
@@ -51,12 +57,13 @@
 
 typedef struct xdl
 {
-    struct xdl       *next;
-
     char             *pathname;
     uintptr_t         load_bias;
     const ElfW(Phdr) *dlpi_phdr;
     ElfW(Half)        dlpi_phnum;
+
+    struct xdl       *next; // to next xdl obj for cache in xdl_addr()
+    void             *linker_handle; // hold handle returned by xdl_linker_load()
 
     //
     // (1) for searching symbols from .dynsym
@@ -357,7 +364,7 @@ static int xdl_symtab_load(xdl_t *self)
     return r;
 }
 
-static int xdl_open_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg)
+static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg)
 {
     (void)size;
 
@@ -398,27 +405,50 @@ static int xdl_open_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg
     return 1; // OK
 }
 
-void *xdl_open(const char *filename)
+static xdl_t *xdl_find(const char *filename)
 {
-    if(NULL == filename) return NULL;
-
     xdl_t *self = NULL;
     uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)filename};
 
     int iterate_flags = XDL_FULL_PATHNAME;
-    if(xdl_util_ends_with(filename, XDL_CONST_BASENAME_LINKER)) iterate_flags |= XDL_WITH_LINKER;
-    xdl_iterate_phdr(xdl_open_iterate_cb, pkg, iterate_flags);
+    if(xdl_util_ends_with(filename, XDL_LINKER_BASENAME)) iterate_flags |= XDL_WITH_LINKER;
+    xdl_iterate_phdr(xdl_find_iterate_cb, pkg, iterate_flags);
 
-    return (void *)self;
+    return self;
 }
 
-void xdl_close(void *handle)
+void *xdl_open(const char *filename)
 {
-    if(NULL == handle) return;
+    if(NULL == filename) return NULL;
+
+    // find
+    xdl_t *self = xdl_find(filename);
+    if(NULL != self) return (void *)self;
+
+    // try to load library from disk to memory
+    void *linker_handle = xdl_linker_load(filename);
+    if(NULL == linker_handle) return NULL;
+
+    // find again
+    self = xdl_find(filename);
+    if(NULL != self)
+    {
+        self->linker_handle = linker_handle;
+        return (void *)self;
+    }
+    else
+    {
+        dlclose(linker_handle);
+        return NULL;
+    }
+}
+
+void *xdl_close(void *handle)
+{
+    if(NULL == handle) return NULL;
 
     xdl_t *self = (xdl_t *)handle;
     if(NULL != self->pathname) free(self->pathname);
-
     if(NULL != self->debugdata)
     {
         // free unzipped .gnu_debugdata
@@ -431,7 +461,9 @@ void xdl_close(void *handle)
         if(NULL != self->strtab) free(self->strtab);
     }
 
+    void *linker_handle = self->linker_handle;
     free(self);
+    return linker_handle;
 }
 
 static uint32_t xdl_sysv_hash(const uint8_t *name)
@@ -514,6 +546,8 @@ static ElfW(Sym) *xdl_dynsym_find_symbol_use_gnu_hash(xdl_t *self, const char* s
 
 void *xdl_sym(void *handle, const char *symbol)
 {
+    if(NULL == handle || NULL == symbol) return NULL;
+
     xdl_t *self = (xdl_t *)handle;
 
     // load .dynsym only once
@@ -543,6 +577,8 @@ void *xdl_sym(void *handle, const char *symbol)
 
 void *xdl_dsym(void *handle, const char *symbol)
 {
+    if(NULL == handle || NULL == symbol) return NULL;
+
     xdl_t *self = (xdl_t *)handle;
 
     // load .symtab only once
@@ -703,7 +739,8 @@ static ElfW(Sym) *xdl_dsym_by_addr(void *handle, void * addr)
 
 int xdl_addr(void *addr, Dl_info *info, void **cache)
 {
-    if(NULL == info || NULL == addr || NULL == cache) return 0;
+    if(NULL == addr || NULL == info || NULL == cache) return 0;
+
     memset(info, 0, sizeof(Dl_info));
 
     // lookup handle from cache
@@ -759,5 +796,7 @@ void xdl_addr_clean(void **cache)
 
 int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data, int flags)
 {
+    if(NULL == callback) return 0;
+
     return xdl_iterate_phdr_impl(callback, data, flags);
 }

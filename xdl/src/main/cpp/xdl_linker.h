@@ -19,28 +19,22 @@
 // SOFTWARE.
 //
 
-// Created by caikelun on 2020-10-04.
+// Created by caikelun on 2021-02-21.
 
-#ifndef IO_HEXHACKING_XDL_CONST
-#define IO_HEXHACKING_XDL_CONST
+#ifndef IO_HEXHACKING_XDL_LINKER
+#define IO_HEXHACKING_XDL_LINKER
 
-#ifndef __LP64__
-#define XDL_CONST_PATHNAME_LINKER     "/system/bin/linker" // we only use this when Android < 8.1
-#define XDL_CONST_BASENAME_LINKER     "linker"
-#define XDL_CONST_PATHNAME_LZMA       "/system/lib/liblzma.so"
-#else
-#define XDL_CONST_PATHNAME_LINKER     "/system/bin/linker64" // we only use this when Android < 8.1
-#define XDL_CONST_BASENAME_LINKER     "linker64"
-#define XDL_CONST_PATHNAME_LZMA       "/system/lib64/liblzma.so"
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-#define XDL_CONST_SYM_LINKER_MUTEX    "__dl__ZL10g_dl_mutex"
+void xdl_linker_lock(void);
+void xdl_linker_unlock(void);
 
-#define XDL_CONST_SYM_LZMA_CRCGEN     "CrcGenerateTable"
-#define XDL_CONST_SYM_LZMA_CRC64GEN   "Crc64GenerateTable"
-#define XDL_CONST_SYM_LZMA_CONSTRUCT  "XzUnpacker_Construct"
-#define XDL_CONST_SYM_LZMA_ISFINISHED "XzUnpacker_IsStreamWasFinished"
-#define XDL_CONST_SYM_LZMA_FREE       "XzUnpacker_Free"
-#define XDL_CONST_SYM_LZMA_CODE       "XzUnpacker_Code"
+void *xdl_linker_load(const char *filename);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

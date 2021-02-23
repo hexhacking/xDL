@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.0.2-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.0.4-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2011-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -14,7 +14,7 @@ xDL is an enhanced implementation of the Android DL series functions.
 ## Features
 
 * Enhanced `dlopen()` + `dlsym()` + `dladdr()`.
-    * Lookup all loaded ELF in the current process, including system libraries.
+    * Bypass the restrictions of Android 7.0+ linker namespace.
     * Lookup dynamic link symbols in `.dynsym`.
     * Lookup debuging symbols in `.symtab` and "`.symtab` in `.gnu_debugdata`".
 * Enhanced `dl_iterate_phdr()`.
@@ -33,19 +33,25 @@ If xDL is compiled into an independent dynamic library:
 
 | ABI         | Compressed (KB) | Uncompressed (KB) |
 | :---------- | --------------: | ----------------: |
-| armeabi-v7a | 6.3             | 13.9              |
-| arm64-v8a   | 6.9             | 18.3              |
-| x86         | 7.0             | 13.8              |
-| x86_64      | 7.3             | 18.6              |
+| armeabi-v7a | 6.6             | 13.9              |
+| arm64-v8a   | 7.4             | 18.3              |
+| x86         | 7.5             | 17.9              |
+| x86_64      | 7.8             | 18.6              |
 
 
 ## Usage
 
-xDL uses [Prefab](https://google.github.io/prefab/) package format, which is supported by Android Gradle Plugin 4.0+.
-
-More information: [Using native dependencies](https://developer.android.com/studio/build/native-dependencies)
-
 ### 1. Add dependency in build.gradle
+
+xDL is published on [Maven Central](https://search.maven.org/), and uses [Prefab](https://google.github.io/prefab/) package format for [native dependencies](https://developer.android.com/studio/build/native-dependencies), which is supported by [Android Gradle Plugin 4.0+](https://developer.android.com/studio/releases/gradle-plugin?buildsystem=cmake#native-dependencies).
+
+```Gradle
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+```
 
 ```Gradle
 android {
@@ -55,7 +61,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.2'
+    implementation 'io.hexhacking:xdl:1.0.4'
 }
 ```
 
@@ -129,12 +135,16 @@ There is a sample app in the [xdl-sample](xdl_sample) folder you can refer to.
 
 ```C
 void *xdl_open(const char *filename);
-void  xdl_close(void *handle);
+void *xdl_close(void *handle);
 ```
 
-They are very similar to `dlopen()` and `dlclose()`. But need to pay attention: `xdl_open()` can NOT actually "load" ELF from disk, it just "open" ELF that has been loaded into memory.
+They are very similar to `dlopen()` and `dlclose()`. But there are the following differences:
 
-`filename` can be basename or full pathname. However, Android linker has used the namespace mechanism since 8.0. If you pass basename, you need to make sure that no duplicate ELF is loaded into the current process. `xdl_open()` will only return the first matching ELF. Please consider this fragment of `/proc/self/maps` on Android 10:
+* `xdl_open()` can bypass the restrictions of Android 7.0+ linker namespace.
+* If the library has been loaded into memory, `xdl_open()` will not `dlopen()` it again. (Because most of the system basic libraries will never be `dlclose()` after `dlopen()`)
+* If `xdl_open()` really uses `dlopen()` to load the library, `xdl_close()` will return the handle from linker (the return value of `dlopen()`), and then you can decide whether and when to close it with `dlclose()`.
+
+`filename` can be basename or full pathname. However, Android linker has used the namespace mechanism since 7.0. If you pass basename, you need to make sure that no duplicate ELF is loaded into the current process. `xdl_open()` will only return the first matching ELF. Please consider this fragment of `/proc/self/maps` on Android 10:
 
 ```
 756fc2c000-756fc7c000 r--p 00000000 fd:03 2985  /system/lib64/vndk-sp-29/libc++.so
@@ -180,7 +190,7 @@ void xdl_addr_clean(void **cache);
 `xdl_addr()` is similar to `dladdr()`. But there are a few differences:
 
 * `xdl_addr()` can lookup not only dynamic link symbols, but also debugging symbols. 
-* `xdl_addr()` needs to pass an additional parameter (cache), which will cache the ELF handle opened during the execution of `xdl_addr()`. The purpose of caching is to make subsequent executions of `xdl_addr()` of the same ELF faster. When you do not need to execute `xdl_addr()`, please use `xdl_addr_clean()` to clear the cache. For example:
+* `xdl_addr()` needs to pass an additional parameter (`cache`), which will cache the ELF handle opened during the execution of `xdl_addr()`. The purpose of caching is to make subsequent executions of `xdl_addr()` of the same ELF faster. When you do not need to execute `xdl_addr()`, please use `xdl_addr_clean()` to clear the cache. For example:
 
 ```C
 void *cache = NULL;

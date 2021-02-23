@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.0.2-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.0.4-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2011-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -14,7 +14,7 @@ xDL 是 Android DL 系列函数的增强实现。
 ## 特征
 
 * 增强的 `dlopen()` + `dlsym()` + `dladdr()`。
-    * 查询当前进程中所有已加载的 ELF，包括系统库。
+    * 绕过 Android 7.0+ linker namespace 的限制。
     * 查询 `.dynsym` 中的动态链接符号。
     * 查询 `.symtab` 和 “`.gnu_debugdata` 里的 `.symtab`” 中的调试符号。
 * 增强的 `dl_iterate_phdr()`。
@@ -33,19 +33,25 @@ xDL 是 Android DL 系列函数的增强实现。
 
 | ABI         | 压缩后 (KB) | 未压缩 (KB) |
 | :---------- | ---------: | ---------: |
-| armeabi-v7a | 6.3        | 13.9       |
-| arm64-v8a   | 6.9        | 18.3       |
-| x86         | 7.0        | 13.8       |
-| x86_64      | 7.3        | 18.6       |
+| armeabi-v7a | 6.6        | 13.9       |
+| arm64-v8a   | 7.4        | 18.3       |
+| x86         | 7.5        | 17.9       |
+| x86_64      | 7.8        | 18.6       |
 
 
 ## 使用
 
-xDL 使用从 Android Gradle Plugin 4.0+ 开始支持的 [Prefab](https://google.github.io/prefab/) 包格式。
-
-更多信息: [使用 native 依赖项](https://developer.android.com/studio/build/native-dependencies)
-
 ### 1. 在 build.gradle 中增加依赖
+
+xDL 发布在 [Maven Central](https://search.maven.org/) 上。为了使用 [native 依赖项](https://developer.android.com/studio/build/native-dependencies)，xDL 使用了从 [Android Gradle Plugin 4.0+](https://developer.android.com/studio/releases/gradle-plugin?buildsystem=cmake#native-dependencies) 开始支持的 [Prefab](https://google.github.io/prefab/) 包格式。
+
+```Gradle
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+```
 
 ```Gradle
 android {
@@ -55,7 +61,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.hexhacking.xdl:xdl-android-lib:1.0.2'
+    implementation 'io.hexhacking:xdl:1.0.4'
 }
 ```
 
@@ -129,12 +135,16 @@ android {
 
 ```C
 void *xdl_open(const char *filename);
-void  xdl_close(void *handle);
+void *xdl_close(void *handle);
 ```
 
-它们和 `dlopen()` / `dlclose()` 很相似。但是需要注意：`xdl_open()` 并不能真正的从磁盘中“加载” ELF 文件，它只是从内存中“打开”已加载的 ELF 文件。
+它们和 `dlopen()` / `dlclose()` 很相似。但存在以下不同：
 
-`filename` 可是是文件名（basename）也可以是完整的路径名（full pathname）。然而，Android linker 从 8.0 开始启用了 namespace 机制。如果你传递文件名，你需要确认当前进程中没有重名的 ELF 文件。`xdl_open()` 只会返回第一个匹配到的 ELF文件。请考虑以下 Android 10 中的 `/proc/self/maps` 片段：
+* `xdl_open()` 可以绕过 Android 7.0+ linker namespace 的限制。
+* 如果动态库已经被加载到内存中了，`xdl_open()` 不会再使用 `dlopen()` 打开它。（因为绝大多数的系统基础库在被 `dlopen()` 后不会再被 `dlclose()`）
+* 如果 `xdl_open()` 真的使用 `dlopen()` 加载了动态库，`xdl_close()` 将返回从 linker 那里取得的 handle（`dlopen()` 的返回值），然后你可以决定是否以及什么时候用 `dlclose()` 来关闭它。
+
+`filename` 可是是文件名（basename）也可以是完整的路径名（full pathname）。然而，Android linker 从 7.0 开始启用了 namespace 机制。如果你传递文件名，你需要确认当前进程中没有重名的 ELF 文件。`xdl_open()` 只会返回第一个匹配到的 ELF文件。请考虑以下 Android 10 中的 `/proc/self/maps` 片段：
 
 ```
 756fc2c000-756fc7c000 r--p 00000000 fd:03 2985  /system/lib64/vndk-sp-29/libc++.so

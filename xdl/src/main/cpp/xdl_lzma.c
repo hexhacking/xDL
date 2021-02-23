@@ -32,7 +32,19 @@
 #include "xdl_lzma.h"
 #include "xdl.h"
 #include "xdl_util.h"
-#include "xdl_const.h"
+
+// LZMA library pathname & symbol names
+#ifndef __LP64__
+#define XDL_LZMA_PATHNAME       "/system/lib/liblzma.so"
+#else
+#define XDL_LZMA_PATHNAME       "/system/lib64/liblzma.so"
+#endif
+#define XDL_LZMA_SYM_CRCGEN     "CrcGenerateTable"
+#define XDL_LZMA_SYM_CRC64GEN   "Crc64GenerateTable"
+#define XDL_LZMA_SYM_CONSTRUCT  "XzUnpacker_Construct"
+#define XDL_LZMA_SYM_ISFINISHED "XzUnpacker_IsStreamWasFinished"
+#define XDL_LZMA_SYM_FREE       "XzUnpacker_Free"
+#define XDL_LZMA_SYM_CODE       "XzUnpacker_Code"
 
 // LZMA data type definition
 #define SZ_OK 0
@@ -74,17 +86,17 @@ static void *xdl_lzma_code = NULL;
 // LZMA init
 static void xdl_lzma_init()
 {
-    void *lzma = xdl_open(XDL_CONST_PATHNAME_LZMA);
+    void *lzma = xdl_open(XDL_LZMA_PATHNAME);
     if(NULL == lzma) return;
 
     xdl_lzma_crcgen_t crcgen = NULL;
     xdl_lzma_crc64gen_t crc64gen = NULL;
-    if(NULL == (crcgen = (xdl_lzma_crcgen_t)xdl_sym(lzma, XDL_CONST_SYM_LZMA_CRCGEN))) goto end;
-    if(NULL == (crc64gen = (xdl_lzma_crc64gen_t)xdl_sym(lzma, XDL_CONST_SYM_LZMA_CRC64GEN))) goto end;
-    if(NULL == (xdl_lzma_construct = (xdl_lzma_construct_t)xdl_sym(lzma, XDL_CONST_SYM_LZMA_CONSTRUCT))) goto end;
-    if(NULL == (xdl_lzma_isfinished = (xdl_lzma_isfinished_t)xdl_sym(lzma, XDL_CONST_SYM_LZMA_ISFINISHED))) goto end;
-    if(NULL == (xdl_lzma_free = (xdl_lzma_free_t)xdl_sym(lzma, XDL_CONST_SYM_LZMA_FREE))) goto end;
-    if(NULL == (xdl_lzma_code = xdl_sym(lzma, XDL_CONST_SYM_LZMA_CODE))) goto end;
+    if(NULL == (crcgen = (xdl_lzma_crcgen_t)xdl_sym(lzma, XDL_LZMA_SYM_CRCGEN))) goto end;
+    if(NULL == (crc64gen = (xdl_lzma_crc64gen_t)xdl_sym(lzma, XDL_LZMA_SYM_CRC64GEN))) goto end;
+    if(NULL == (xdl_lzma_construct = (xdl_lzma_construct_t)xdl_sym(lzma, XDL_LZMA_SYM_CONSTRUCT))) goto end;
+    if(NULL == (xdl_lzma_isfinished = (xdl_lzma_isfinished_t)xdl_sym(lzma, XDL_LZMA_SYM_ISFINISHED))) goto end;
+    if(NULL == (xdl_lzma_free = (xdl_lzma_free_t)xdl_sym(lzma, XDL_LZMA_SYM_FREE))) goto end;
+    if(NULL == (xdl_lzma_code = xdl_sym(lzma, XDL_LZMA_SYM_CODE))) goto end;
     crcgen();
     crc64gen();
 

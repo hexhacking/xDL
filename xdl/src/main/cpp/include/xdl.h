@@ -22,7 +22,7 @@
 // Created by caikelun on 2020-10-04.
 
 //
-// xDL version: 1.0.2
+// xDL version: 1.0.4
 //
 // You can always get the latest version from:
 // https://github.com/hexhacking/xDL
@@ -43,7 +43,7 @@ extern "C" {
 // Enhanced dlopen() / dlclose() / dlsym()
 //
 void *xdl_open(const char *filename);
-void xdl_close(void *handle);
+void *xdl_close(void *handle);
 
 void *xdl_sym(void *handle, const char *symbol);
 void *xdl_dsym(void *handle, const char *symbol);
