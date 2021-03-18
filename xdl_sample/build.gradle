@@ -52,4 +52,15 @@ dependencies {
 //    implementation 'io.hexhacking:xdl:1.0.4'
 }
 
+// Bypass the compatibility issue between prefab and gradle-project-dependencies.
+// Note: This is not required for gradle-maven-dependencies.
+tasks.whenTaskAdded { task ->
+    if (task.name == 'generateJsonModelDebug') {
+        task.dependsOn(':xdl:prefabDebugPackage')
+    }
+    else if (task.name == 'generateJsonModelRelease') {
+        task.dependsOn(':xdl:prefabReleasePackage')
+    }
+}
+
 apply from: rootProject.file('gradle/sanitizer.gradle')
