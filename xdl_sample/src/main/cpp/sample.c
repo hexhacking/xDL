@@ -69,9 +69,9 @@ static void sample_test_iterate(void)
     usleep(100 * 1000);
 }
 
-static void *sample_test_dlsym(const char *filename, const char *symbol, bool debug_symbol, void **cache, bool dlopen_check)
+static void *sample_test_dlsym(const char *filename, const char *symbol, bool debug_symbol, void **cache, bool try_force_dlopen)
 {
-    if(dlopen_check)
+    if(try_force_dlopen)
     {
         void *linker_handle = dlopen(filename, RTLD_NOW);
         LOG("--- dlopen(%s) : handle %"PRIxPTR, filename, (uintptr_t)linker_handle);
@@ -81,12 +81,13 @@ static void *sample_test_dlsym(const char *filename, const char *symbol, bool de
     LOG("+++ xdl_open + %s + xdl_addr", debug_symbol ? "xdl_dsym" : "xdl_sym");
 
     // xdl_open
-    void *handle = xdl_open(filename);
+    void *handle = xdl_open(filename, try_force_dlopen ? XDL_TRY_FORCE_LOAD : XDL_DEFAULT);
     LOG(">>> xdl_open(%s) : handle %"PRIxPTR, filename, (uintptr_t)handle);
 
     // xdl_dsym / xdl_sym
-    void *symbol_addr = (debug_symbol ? xdl_dsym : xdl_sym)(handle, symbol);
-    LOG(">>> %s(%s) : addr %"PRIxPTR, debug_symbol ? "xdl_dsym" : "xdl_sym", symbol, (uintptr_t)symbol_addr);
+    size_t symbol_size = 0;
+    void *symbol_addr = (debug_symbol ? xdl_dsym : xdl_sym)(handle, symbol, &symbol_size);
+    LOG(">>> %s(%s) : addr %"PRIxPTR", sz %zu", debug_symbol ? "xdl_dsym" : "xdl_sym", symbol, (uintptr_t)symbol_addr, symbol_size);
 
     // xdl_close
     void *linker_handle = xdl_close(handle);

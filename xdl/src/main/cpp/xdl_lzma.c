@@ -86,17 +86,17 @@ static void *xdl_lzma_code = NULL;
 // LZMA init
 static void xdl_lzma_init()
 {
-    void *lzma = xdl_open(XDL_LZMA_PATHNAME);
+    void *lzma = xdl_open(XDL_LZMA_PATHNAME, XDL_TRY_FORCE_LOAD);
     if(NULL == lzma) return;
 
     xdl_lzma_crcgen_t crcgen = NULL;
     xdl_lzma_crc64gen_t crc64gen = NULL;
-    if(NULL == (crcgen = (xdl_lzma_crcgen_t)xdl_sym(lzma, XDL_LZMA_SYM_CRCGEN))) goto end;
-    if(NULL == (crc64gen = (xdl_lzma_crc64gen_t)xdl_sym(lzma, XDL_LZMA_SYM_CRC64GEN))) goto end;
-    if(NULL == (xdl_lzma_construct = (xdl_lzma_construct_t)xdl_sym(lzma, XDL_LZMA_SYM_CONSTRUCT))) goto end;
-    if(NULL == (xdl_lzma_isfinished = (xdl_lzma_isfinished_t)xdl_sym(lzma, XDL_LZMA_SYM_ISFINISHED))) goto end;
-    if(NULL == (xdl_lzma_free = (xdl_lzma_free_t)xdl_sym(lzma, XDL_LZMA_SYM_FREE))) goto end;
-    if(NULL == (xdl_lzma_code = xdl_sym(lzma, XDL_LZMA_SYM_CODE))) goto end;
+    if(NULL == (crcgen = (xdl_lzma_crcgen_t)xdl_sym(lzma, XDL_LZMA_SYM_CRCGEN, NULL))) goto end;
+    if(NULL == (crc64gen = (xdl_lzma_crc64gen_t)xdl_sym(lzma, XDL_LZMA_SYM_CRC64GEN, NULL))) goto end;
+    if(NULL == (xdl_lzma_construct = (xdl_lzma_construct_t)xdl_sym(lzma, XDL_LZMA_SYM_CONSTRUCT, NULL))) goto end;
+    if(NULL == (xdl_lzma_isfinished = (xdl_lzma_isfinished_t)xdl_sym(lzma, XDL_LZMA_SYM_ISFINISHED, NULL))) goto end;
+    if(NULL == (xdl_lzma_free = (xdl_lzma_free_t)xdl_sym(lzma, XDL_LZMA_SYM_FREE, NULL))) goto end;
+    if(NULL == (xdl_lzma_code = xdl_sym(lzma, XDL_LZMA_SYM_CODE, NULL))) goto end;
     crcgen();
     crc64gen();
 

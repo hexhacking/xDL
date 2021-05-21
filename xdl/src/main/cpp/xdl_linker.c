@@ -55,29 +55,29 @@ static void xdl_linker_init(void)
     if(inited) return;
     inited = true;
 
-    void *handle = xdl_open(XDL_LINKER_BASENAME);
+    void *handle = xdl_open(XDL_LINKER_BASENAME, XDL_DEFAULT);
     if(NULL == handle) return;
 
     int api_level = xdl_util_get_api_level();
     if(__ANDROID_API_L__ == api_level || __ANDROID_API_L_MR1__ == api_level)
     {
         // == Android 5.x
-        xdl_linker_mutex = (pthread_mutex_t *)xdl_dsym(handle, XDL_LINKER_SYM_MUTEX);
+        xdl_linker_mutex = (pthread_mutex_t *)xdl_dsym(handle, XDL_LINKER_SYM_MUTEX, NULL);
     }
     else if(__ANDROID_API_N__ == api_level || __ANDROID_API_N_MR1__ == api_level)
     {
         // == Android 7.x
-        xdl_linker_dlopen_ext = (xdl_linker_dlopen_ext_t)xdl_dsym(handle, XDL_LINKER_SYM_DLOPEN_EXT);
+        xdl_linker_dlopen_ext = (xdl_linker_dlopen_ext_t)xdl_dsym(handle, XDL_LINKER_SYM_DLOPEN_EXT, NULL);
         if(NULL == xdl_linker_dlopen_ext)
         {
-            xdl_linker_do_dlopen = (xdl_linker_do_dlopen_t)xdl_dsym(handle, XDL_LINKER_SYM_DO_DLOPEN);
-            xdl_linker_mutex = (pthread_mutex_t *)xdl_dsym(handle, XDL_LINKER_SYM_MUTEX);
+            xdl_linker_do_dlopen = (xdl_linker_do_dlopen_t)xdl_dsym(handle, XDL_LINKER_SYM_DO_DLOPEN, NULL);
+            xdl_linker_mutex = (pthread_mutex_t *)xdl_dsym(handle, XDL_LINKER_SYM_MUTEX, NULL);
         }
     }
     else if(api_level >= __ANDROID_API_O__)
     {
         // >= Android 8.0
-        xdl_linker_loader_dlopen = (xdl_linker_loader_dlopen_t)xdl_sym(handle, XDL_LINKER_SYM_LOADER_DLOPEN);
+        xdl_linker_loader_dlopen = (xdl_linker_loader_dlopen_t)xdl_sym(handle, XDL_LINKER_SYM_LOADER_DLOPEN, NULL);
     }
 
     xdl_close(handle);

@@ -44,12 +44,12 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'androidx.appcompat:appcompat:1.3.0'
     implementation 'com.google.android.material:material:1.3.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
 
     implementation project(':xdl')
-//    implementation 'io.hexhacking:xdl:1.0.4'
+//    implementation 'io.hexhacking:xdl:1.1.0'
 }
 
 // Bypass the compatibility issue between prefab and gradle-project-dependencies.

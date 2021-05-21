@@ -1,10 +1,10 @@
 buildscript {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.2'
+        classpath 'com.android.tools.build:gradle:4.2.1'
     }
 }
 
@@ -13,7 +13,6 @@ allprojects {
 //        mavenLocal()
         google()
         mavenCentral()
-        jcenter()
     }
 }
 
@@ -26,15 +25,15 @@ ext {
     compileSdkVersion = 30
     targetSdkVersion = 30
     buildToolsVersion = "30.0.3"
-    javaVersion = JavaVersion.VERSION_1_6
+    javaVersion = JavaVersion.VERSION_1_7
     ndkVersion = "21.4.7075529"
-    cmakeVersion = "3.10.2"
+    cmakeVersion = "3.18.1"
     abiFilters = "armeabi-v7a,arm64-v8a,x86,x86_64"
     useASAN = false
 
     POM_GROUP_ID = "io.hexhacking"
     POM_ARTIFACT_ID = "xdl"
-    POM_VERSION_NAME = "1.0.4"
+    POM_VERSION_NAME = "1.1.0"
 
     POM_NAME = "xDL Android Lib"
     POM_DESCRIPTION = "xDL is an enhanced implementation of the Android DL series functions."

@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.0.4-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.1.0-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2011-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -33,10 +33,10 @@ xDL 是 Android DL 系列函数的增强实现。
 
 | ABI         | 压缩后 (KB) | 未压缩 (KB) |
 | :---------- | ---------: | ---------: |
-| armeabi-v7a | 6.6        | 13.9       |
-| arm64-v8a   | 7.4        | 18.3       |
-| x86         | 7.5        | 17.9       |
-| x86_64      | 7.8        | 18.6       |
+| armeabi-v7a | 6.8        | 13.9       |
+| arm64-v8a   | 7.5        | 18.3       |
+| x86         | 7.7        | 17.9       |
+| x86_64      | 7.9        | 18.6       |
 
 
 ## 使用
@@ -61,7 +61,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.hexhacking:xdl:1.0.4'
+    implementation 'io.hexhacking:xdl:1.1.0'
 }
 ```
 
@@ -134,15 +134,23 @@ android {
 ### 1. `xdl_open()` 和 `xdl_close()`
 
 ```C
-void *xdl_open(const char *filename);
+#define XDL_DEFAULT           0x00
+#define XDL_TRY_FORCE_LOAD    0x01
+#define XDL_ALWAYS_FORCE_LOAD 0x02
+
+void *xdl_open(const char *filename, int flags);
 void *xdl_close(void *handle);
 ```
 
-它们和 `dlopen()` / `dlclose()` 很相似。但存在以下不同：
+它们和 `dlopen()` / `dlclose()` 很相似。但是 `xdl_open()` 可以绕过 Android 7.0+ linker namespace 的限制。
 
-* `xdl_open()` 可以绕过 Android 7.0+ linker namespace 的限制。
-* 如果动态库已经被加载到内存中了，`xdl_open()` 不会再使用 `dlopen()` 打开它。（因为绝大多数的系统基础库在被 `dlopen()` 后不会再被 `dlclose()`）
-* 如果 `xdl_open()` 真的使用 `dlopen()` 加载了动态库，`xdl_close()` 将返回从 linker 那里取得的 handle（`dlopen()` 的返回值），然后你可以决定是否以及什么时候用 `dlclose()` 来关闭它。
+根据 `flags` 参数值的不同，`xdl_open()` 的行为会有一些差异：
+
+* `XDL_DEFAULT`: 如果动态库已经被加载到内存中了，`xdl_open()` 不会再使用 `dlopen()` 加载它。（但依然会返回一个有效的 `handle`）
+* `XDL_TRY_FORCE_LOAD`: 如果动态库还没有被加载到内存中，`xdl_open()` 将尝试使用 `dlopen()` 加载它。
+* `XDL_ALWAYS_FORCE_LOAD`: `xdl_open()` 将总是使用 `dlopen()` 加载动态库。
+
+如果 `xdl_open()` 真的使用 `dlopen()` 加载了动态库，`xdl_close()` 将返回从 linker 那里取得的 handle（`dlopen()` 的返回值），然后你可以决定是否以及什么时候使用标准的 `dlclose()` 来关闭它。否则，将返回 `NULL`。
 
 `filename` 可是是文件名（basename）也可以是完整的路径名（full pathname）。然而，Android linker 从 7.0 开始启用了 namespace 机制。如果你传递文件名，你需要确认当前进程中没有重名的 ELF 文件。`xdl_open()` 只会返回第一个匹配到的 ELF文件。请考虑以下 Android 10 中的 `/proc/self/maps` 片段：
 
@@ -164,11 +172,13 @@ void *xdl_close(void *handle);
 ### 2. `xdl_sym()` 和 `xdl_dsym()`
 
 ```C
-void *xdl_sym(void *handle, const char *symbol);
-void *xdl_dsym(void *handle, const char *symbol);
+void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size);
+void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size);
 ```
 
 它们和 `dlsym()` 很相似。 它们都需要传递一个 `xdl_open()` 返回的 “handle”，和一个 null 结尾的符号名字，返回该符号在内存中的加载地址。
+
+如果 `symbol_size` 参数不为 `NULL`，它将被赋值为“符号对应的内容在 ELF 中占用的字节数”，如果你不需要这个信息，传递 `NULL` 就可以了。
 
 `xdl_sym()` 从 `.dynsym` 中查询 “动态链接符号”，就像 `dlsym()` 做的那样。
 

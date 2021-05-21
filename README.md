@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.0.4-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.1.0-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2011-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -33,10 +33,10 @@ If xDL is compiled into an independent dynamic library:
 
 | ABI         | Compressed (KB) | Uncompressed (KB) |
 | :---------- | --------------: | ----------------: |
-| armeabi-v7a | 6.6             | 13.9              |
-| arm64-v8a   | 7.4             | 18.3              |
-| x86         | 7.5             | 17.9              |
-| x86_64      | 7.8             | 18.6              |
+| armeabi-v7a | 6.8             | 13.9              |
+| arm64-v8a   | 7.5             | 18.3              |
+| x86         | 7.7             | 17.9              |
+| x86_64      | 7.9             | 18.6              |
 
 
 ## Usage
@@ -61,7 +61,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.hexhacking:xdl:1.0.4'
+    implementation 'io.hexhacking:xdl:1.1.0'
 }
 ```
 
@@ -134,15 +134,23 @@ There is a sample app in the [xdl-sample](xdl_sample) folder you can refer to.
 ### 1. `xdl_open()` and `xdl_close()`
 
 ```C
-void *xdl_open(const char *filename);
+#define XDL_DEFAULT           0x00
+#define XDL_TRY_FORCE_LOAD    0x01
+#define XDL_ALWAYS_FORCE_LOAD 0x02
+
+void *xdl_open(const char *filename, int flags);
 void *xdl_close(void *handle);
 ```
 
-They are very similar to `dlopen()` and `dlclose()`. But there are the following differences:
+They are very similar to `dlopen()` and `dlclose()`. But `xdl_open()` can bypass the restrictions of Android 7.0+ linker namespace.
 
-* `xdl_open()` can bypass the restrictions of Android 7.0+ linker namespace.
-* If the library has been loaded into memory, `xdl_open()` will not `dlopen()` it again. (Because most of the system basic libraries will never be `dlclose()` after `dlopen()`)
-* If `xdl_open()` really uses `dlopen()` to load the library, `xdl_close()` will return the handle from linker (the return value of `dlopen()`), and then you can decide whether and when to close it with `dlclose()`.
+Depending on the value of the `flags` parameter, the behavior of `xdl_open()` will have some differences:
+
+* `XDL_DEFAULT`: If the library has been loaded into memory, `xdl_open()` will not `dlopen()` it again. (But it will still return a valid `handle`)
+* `XDL_TRY_FORCE_LOAD`: If the library has not been loaded into memory, `xdl_open()` will try to `dlopen()` it.
+* `XDL_ALWAYS_FORCE_LOAD`: `xdl_open()` will always `dlopen()` the library.
+
+If `xdl_open()` really uses `dlopen()` to load the library, `xdl_close()` will return the handle from linker (the return value of `dlopen()`), and then you can decide whether and when to close it with standard `dlclose()`. Otherwise, `NULL` will be returned.
 
 `filename` can be basename or full pathname. However, Android linker has used the namespace mechanism since 7.0. If you pass basename, you need to make sure that no duplicate ELF is loaded into the current process. `xdl_open()` will only return the first matching ELF. Please consider this fragment of `/proc/self/maps` on Android 10:
 
@@ -164,11 +172,13 @@ They are very similar to `dlopen()` and `dlclose()`. But there are the following
 ### 2. `xdl_sym()` and `xdl_dsym()`
 
 ```C
-void *xdl_sym(void *handle, const char *symbol);
-void *xdl_dsym(void *handle, const char *symbol);
+void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size);
+void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size);
 ```
 
 They are very similar to `dlsym()`. They all takes a "handle" of an ELF returned by `xdl_open()` and the null-terminated symbol name, returning the address where that symbol is loaded into memory.
+
+If the `symbol_size` parameter is not `NULL`, it will be assigned as "the bytes occupied by the content corresponding to the symbol in the ELF". If you don't need this information, just pass `NULL`.
 
 `xdl_sym()` lookup "dynamic link symbols" in `.dynsym` as `dlsym()` does.
 

@@ -405,7 +405,7 @@ static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg
     return 1; // OK
 }
 
-static xdl_t *xdl_find(const char *filename)
+static xdl_t *xdl_lookup(const char *filename)
 {
     xdl_t *self = NULL;
     uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)filename};
@@ -417,30 +417,52 @@ static xdl_t *xdl_find(const char *filename)
     return self;
 }
 
-void *xdl_open(const char *filename)
+static void *xdl_open_always_force(const char *filename)
 {
-    if(NULL == filename) return NULL;
-
-    // find
-    xdl_t *self = xdl_find(filename);
-    if(NULL != self) return (void *)self;
-
-    // try to load library from disk to memory
+    // always force dlopen()
     void *linker_handle = xdl_linker_load(filename);
     if(NULL == linker_handle) return NULL;
 
-    // find again
-    self = xdl_find(filename);
-    if(NULL != self)
-    {
-        self->linker_handle = linker_handle;
-        return (void *)self;
-    }
-    else
-    {
+    // lookup
+    xdl_t *self = xdl_lookup(filename);
+    if(NULL == self)
         dlclose(linker_handle);
-        return NULL;
-    }
+    else
+        self->linker_handle = linker_handle;
+
+    return (void *)self;
+}
+
+static void *xdl_open_try_force(const char *filename)
+{
+    // lookup
+    xdl_t *self = xdl_lookup(filename);
+    if(NULL != self) return (void *)self;
+
+    // try force dlopen()
+    void *linker_handle = xdl_linker_load(filename);
+    if(NULL == linker_handle) return NULL;
+
+    // lookup again
+    self = xdl_lookup(filename);
+    if(NULL == self)
+        dlclose(linker_handle);
+    else
+        self->linker_handle = linker_handle;
+
+    return (void *)self;
+}
+
+void *xdl_open(const char *filename, int flags)
+{
+    if(NULL == filename) return NULL;
+
+    if(flags & XDL_ALWAYS_FORCE_LOAD)
+        return xdl_open_always_force(filename);
+    else if(flags & XDL_TRY_FORCE_LOAD)
+        return xdl_open_try_force(filename);
+    else
+        return xdl_lookup(filename);
 }
 
 void *xdl_close(void *handle)
@@ -544,9 +566,10 @@ static ElfW(Sym) *xdl_dynsym_find_symbol_use_gnu_hash(xdl_t *self, const char* s
     return NULL;
 }
 
-void *xdl_sym(void *handle, const char *symbol)
+void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size)
 {
     if(NULL == handle || NULL == symbol) return NULL;
+    if(NULL != symbol_size) *symbol_size = 0;
 
     xdl_t *self = (xdl_t *)handle;
 
@@ -572,12 +595,14 @@ void *xdl_sym(void *handle, const char *symbol)
     }
     if(NULL == sym || !XDL_DYNSYM_IS_EXPORT_SYM(sym->st_shndx)) return NULL;
 
+    if(NULL != symbol_size) *symbol_size = sym->st_size;
     return (void *)(self->load_bias + sym->st_value);
 }
 
-void *xdl_dsym(void *handle, const char *symbol)
+void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size)
 {
     if(NULL == handle || NULL == symbol) return NULL;
+    if(NULL != symbol_size) *symbol_size = 0;
 
     xdl_t *self = (xdl_t *)handle;
 
@@ -597,6 +622,7 @@ void *xdl_dsym(void *handle, const char *symbol)
         if(!XDL_SYMTAB_IS_EXPORT_SYM(sym->st_shndx)) continue;
         if(0 != strncmp(self->strtab + sym->st_name, symbol, self->strtab_sz - sym->st_name)) continue;
 
+        if(NULL != symbol_size) *symbol_size = sym->st_size;
         return (void *)(self->load_bias + sym->st_value);
     }
 

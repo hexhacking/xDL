@@ -1,47 +1,17 @@
-cmake_minimum_required(VERSION 3.10.2)
+cmake_minimum_required(VERSION 3.18.1)
+project(xdl)
 
-add_compile_options(
-        -std=c11
-        -Weverything
-        -Werror)
-
-file(GLOB XDL_SRC
-        *.c)
-
-add_library(xdl SHARED
-        ${XDL_SRC})
-
-target_include_directories(xdl PUBLIC
-        include
-        .)
-
-#target_link_libraries(xdl
-#        log)
+file(GLOB XDL_SRC *.c)
+add_library(xdl SHARED ${XDL_SRC})
+target_compile_features(xdl PUBLIC c_std_11)
+target_compile_options(xdl PUBLIC -Weverything -Werror)
+target_include_directories(xdl PUBLIC include .)
+#target_link_libraries(xdl log)
 
 if(USEASAN)
-
-target_compile_options(xdl PUBLIC
-        -fsanitize=address
-        -fno-omit-frame-pointer)
-
-set_target_properties(xdl PROPERTIES
-        LINK_FLAGS " \
-        -fsanitize=address")
-
+target_compile_options(xdl PUBLIC -fsanitize=address -fno-omit-frame-pointer)
+target_link_options(xdl PUBLIC -fsanitize=address)
 else()
-
-target_compile_options(xdl PUBLIC
-        -Oz
-        -flto
-        -ffunction-sections
-        -fdata-sections)
-
-set_target_properties(xdl PROPERTIES
-        LINK_FLAGS " \
-        -O3 \
-        -flto \
-        -Wl,--exclude-libs,ALL \
-        -Wl,--gc-sections \
-        -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/xdl.map.txt")
-
+target_compile_options(xdl PUBLIC -Oz -flto -ffunction-sections -fdata-sections)
+target_link_options(xdl PUBLIC -O3 -flto -Wl,--exclude-libs,ALL -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/xdl.map.txt)
 endif()

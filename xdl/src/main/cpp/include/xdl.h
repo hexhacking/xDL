@@ -22,9 +22,10 @@
 // Created by caikelun on 2020-10-04.
 
 //
-// xDL version: 1.0.4
+// xDL version: 1.1.0
 //
-// You can always get the latest version from:
+// xDL is an enhanced implementation of the Android DL series functions.
+// For more information, documentation, and the latest version please check:
 // https://github.com/hexhacking/xDL
 //
 
@@ -40,27 +41,31 @@ extern "C" {
 #endif
 
 //
-// Enhanced dlopen() / dlclose() / dlsym()
+// Default value for flags in both xdl_open() and xdl_iterate_phdr().
 //
-void *xdl_open(const char *filename);
+#define XDL_DEFAULT 0x00
+
+//
+// Enhanced dlopen() / dlclose() / dlsym().
+//
+#define XDL_TRY_FORCE_LOAD    0x01
+#define XDL_ALWAYS_FORCE_LOAD 0x02
+void *xdl_open(const char *filename, int flags);
 void *xdl_close(void *handle);
-
-void *xdl_sym(void *handle, const char *symbol);
-void *xdl_dsym(void *handle, const char *symbol);
+void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size);
+void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size);
 
 //
-// Enhanced dladdr()
+// Enhanced dladdr().
 //
 int xdl_addr(void *addr, Dl_info *info, void **cache);
 void xdl_addr_clean(void **cache);
 
 //
-// Enhanced dl_iterate_phdr()
+// Enhanced dl_iterate_phdr().
 //
-#define XDL_DEFAULT       0x00
 #define XDL_WITH_LINKER   0x01
 #define XDL_FULL_PATHNAME 0x02
-
 int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data, int flags);
 
 #ifdef __cplusplus

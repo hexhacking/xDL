@@ -41,7 +41,7 @@
                 android:gravity="center"
                 android:textSize="50px"
                 android:textColor="#000000"
-                android:text="adb logcat | grep xdl_tag" />
+                android:text="adb logcat -s xdl_tag" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

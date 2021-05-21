@@ -18,7 +18,8 @@ project.afterEvaluate {
                 }
 
                 // create ASAN wrap.sh
-                def resDir = new File("src/main/resources/lib/" + abi)
+                def projectDir = project.projectDir.toString()
+                def resDir = new File(projectDir + "/src/main/resources/lib/" + abi)
                 resDir.mkdirs()
                 def wrapFile = new File(resDir, "wrap.sh")
                 wrapFile.withWriter { writer ->
@@ -36,7 +37,7 @@ project.afterEvaluate {
                 println "sanitizer: [${abi}] create wrap.sh: " + wrapFile.absolutePath
 
                 // copy ASAN libs
-                def libDir = new File("src/main/jniLibs/" + abi)
+                def libDir = new File(projectDir + "/src/main/jniLibs/" + abi)
                 libDir.mkdirs()
                 FileTree tree = fileTree(dir: ndkLibDir).include("**/libclang_rt.asan-${arch}-android.so")
                 tree.each { File file ->
