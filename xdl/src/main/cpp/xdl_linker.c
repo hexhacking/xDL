@@ -36,8 +36,10 @@
 #endif
 
 #define XDL_LINKER_SYM_MUTEX         "__dl__ZL10g_dl_mutex"
-#define XDL_LINKER_SYM_DLOPEN_EXT    "__dl__ZL10dlopen_extPKciPK17android_dlextinfoPv"
-#define XDL_LINKER_SYM_DO_DLOPEN     "__dl__Z9do_dlopenPKciPK17android_dlextinfoPv"
+#define XDL_LINKER_SYM_DLOPEN_EXT_N  "__dl__ZL10dlopen_extPKciPK17android_dlextinfoPv"
+#define XDL_LINKER_SYM_DO_DLOPEN_N   "__dl__Z9do_dlopenPKciPK17android_dlextinfoPv"
+#define XDL_LINKER_SYM_DLOPEN_EXT_O  "__dl__ZL10dlopen_extPKciPK17android_dlextinfoPKv"
+#define XDL_LINKER_SYM_DO_DLOPEN_O   "__dl__Z9do_dlopenPKciPK17android_dlextinfoPKv"
 #define XDL_LINKER_SYM_LOADER_DLOPEN "__loader_dlopen"
 
 typedef void *(*xdl_linker_dlopen_ext_t)(const char *, int, const void *, void *);
@@ -47,7 +49,7 @@ typedef void *(*xdl_linker_loader_dlopen_t)(const char *, int, const void *);
 static pthread_mutex_t *xdl_linker_mutex = NULL;
 static xdl_linker_dlopen_ext_t xdl_linker_dlopen_ext = NULL;
 static xdl_linker_do_dlopen_t xdl_linker_do_dlopen = NULL;
-static xdl_linker_loader_dlopen_t  xdl_linker_loader_dlopen = NULL;
+static xdl_linker_loader_dlopen_t xdl_linker_loader_dlopen = NULL;
 
 static void xdl_linker_init(void)
 {
@@ -64,17 +66,18 @@ static void xdl_linker_init(void)
         // == Android 5.x
         xdl_linker_mutex = (pthread_mutex_t *)xdl_dsym(handle, XDL_LINKER_SYM_MUTEX, NULL);
     }
-    else if(__ANDROID_API_N__ == api_level || __ANDROID_API_N_MR1__ == api_level)
+    else if(__ANDROID_API_N__ <= api_level && api_level <= __ANDROID_API_O_MR1__)
     {
-        // == Android 7.x
-        xdl_linker_dlopen_ext = (xdl_linker_dlopen_ext_t)xdl_dsym(handle, XDL_LINKER_SYM_DLOPEN_EXT, NULL);
+        // == Android 7.x or 8.x
+        bool is_n = (__ANDROID_API_N__ == api_level || __ANDROID_API_N_MR1__ == api_level);
+        xdl_linker_dlopen_ext = (xdl_linker_dlopen_ext_t)xdl_dsym(handle, is_n ? XDL_LINKER_SYM_DLOPEN_EXT_N : XDL_LINKER_SYM_DLOPEN_EXT_O, NULL);
         if(NULL == xdl_linker_dlopen_ext)
         {
-            xdl_linker_do_dlopen = (xdl_linker_do_dlopen_t)xdl_dsym(handle, XDL_LINKER_SYM_DO_DLOPEN, NULL);
+            xdl_linker_do_dlopen = (xdl_linker_do_dlopen_t)xdl_dsym(handle, is_n ? XDL_LINKER_SYM_DO_DLOPEN_N : XDL_LINKER_SYM_DO_DLOPEN_O, NULL);
             xdl_linker_mutex = (pthread_mutex_t *)xdl_dsym(handle, XDL_LINKER_SYM_MUTEX, NULL);
         }
     }
-    else if(api_level >= __ANDROID_API_O__)
+    else if(api_level >= __ANDROID_API_P__)
     {
         // >= Android 8.0
         xdl_linker_loader_dlopen = (xdl_linker_loader_dlopen_t)xdl_sym(handle, XDL_LINKER_SYM_LOADER_DLOPEN, NULL);
@@ -109,9 +112,9 @@ void *xdl_linker_load(const char *filename)
         xdl_linker_init();
         void *libc_func = (void *)snprintf;
 
-        if(__ANDROID_API_N__ == api_level || __ANDROID_API_N_MR1__ == api_level)
+        if(__ANDROID_API_N__ <= api_level && api_level <= __ANDROID_API_O_MR1__)
         {
-            // == Android 7.x
+            // == Android 7.x or 8.x
             if(NULL != xdl_linker_dlopen_ext)
                 return xdl_linker_dlopen_ext(filename, RTLD_NOW, NULL, libc_func);
             else if(NULL != xdl_linker_do_dlopen)
@@ -124,7 +127,7 @@ void *xdl_linker_load(const char *filename)
         }
         else
         {
-            // >= Android 8.0
+            // >= Android 9.0
             if(NULL != xdl_linker_loader_dlopen)
                 return xdl_linker_loader_dlopen(filename, RTLD_NOW, libc_func);
         }
