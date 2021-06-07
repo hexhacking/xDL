@@ -93,13 +93,15 @@ static void *sample_test_dlsym(const char *filename, const char *symbol, bool de
     void *linker_handle = xdl_close(handle);
 
     // xdl_addr
-    Dl_info info;
+    xdl_info info;
     if(0 == xdl_addr(symbol_addr, &info, cache))
         LOG(">>> xdl_addr(%"PRIxPTR") : FAILED", (uintptr_t)symbol_addr);
     else
-        LOG(">>> xdl_addr(%"PRIxPTR") : %"PRIxPTR" %s, %"PRIxPTR" %s", (uintptr_t)symbol_addr,
+        LOG(">>> xdl_addr(%"PRIxPTR") : %"PRIxPTR" %s (phdr %"PRIxPTR", phnum %zu), %"PRIxPTR" %s (sz %zu)", (uintptr_t)symbol_addr,
             (uintptr_t)info.dli_fbase, (NULL == info.dli_fname ? "(NULL)" : info.dli_fname),
-            (uintptr_t)info.dli_saddr, (NULL == info.dli_sname ? "(NULL)" : info.dli_sname));
+            (uintptr_t)info.dlpi_phdr, info.dlpi_phnum,
+            (uintptr_t)info.dli_saddr, (NULL == info.dli_sname ? "(NULL)" : info.dli_sname),
+            info.dli_ssize);
 
     LOG(LOG_END);
 

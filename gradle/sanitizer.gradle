@@ -1,6 +1,8 @@
 project.afterEvaluate {
 
     preBuild.doFirst {
+        def projectDir = project.projectDir.toString()
+
         if (rootProject.ext.useASAN) {
             def ndkLibDir = android.ndkDirectory.absolutePath + "/toolchains/llvm/prebuilt/"
             def ABIs = rootProject.ext.abiFilters.split(",")
@@ -18,7 +20,6 @@ project.afterEvaluate {
                 }
 
                 // create ASAN wrap.sh
-                def projectDir = project.projectDir.toString()
                 def resDir = new File(projectDir + "/src/main/resources/lib/" + abi)
                 resDir.mkdirs()
                 def wrapFile = new File(resDir, "wrap.sh")
@@ -49,13 +50,14 @@ project.afterEvaluate {
                 }
             }
         } else {
-            delete 'src/main/resources/'
-            delete 'src/main/jniLibs/'
+            delete projectDir + '/src/main/resources/'
+            delete projectDir + '/src/main/jniLibs/'
         }
     }
 }
 
 clean.doFirst {
-    delete 'src/main/resources/'
-    delete 'src/main/jniLibs/'
+    def projectDir = project.projectDir.toString()
+    delete projectDir + '/src/main/resources/'
+    delete projectDir + '/src/main/jniLibs/'
 }

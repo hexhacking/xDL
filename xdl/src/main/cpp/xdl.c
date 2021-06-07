@@ -763,7 +763,7 @@ static ElfW(Sym) *xdl_dsym_by_addr(void *handle, void * addr)
     return NULL;
 }
 
-int xdl_addr(void *addr, Dl_info *info, void **cache)
+int xdl_addr(void *addr, xdl_info *info, void **cache)
 {
     if(NULL == addr || NULL == info || NULL == cache) return 0;
 
@@ -784,23 +784,28 @@ int xdl_addr(void *addr, Dl_info *info, void **cache)
         *(xdl_t **)cache = handle;
     }
 
-    // we have at least load_bias and pathname
+    // we have at least: load_bias, pathname, dlpi_phdr, dlpi_phnum
     info->dli_fbase = (void *)handle->load_bias;
     info->dli_fname = handle->pathname;
     info->dli_sname = NULL;
     info->dli_saddr = 0;
+    info->dli_ssize = 0;
+    info->dlpi_phdr = handle->dlpi_phdr;
+    info->dlpi_phnum = (size_t)handle->dlpi_phnum;
 
-    // keep looking for symbol name and symbol offset
+    // keep looking for: symbol name, symbol offset, symbol size
     ElfW(Sym) *sym;
     if(NULL != (sym = xdl_sym_by_addr((void *)handle, addr)))
     {
         info->dli_sname = handle->dynstr + sym->st_name;
         info->dli_saddr = (void *)(handle->load_bias + sym->st_value);
+        info->dli_ssize = sym->st_size;
     }
     else if(NULL != (sym = xdl_dsym_by_addr((void *)handle, addr)))
     {
         info->dli_sname = handle->strtab + sym->st_name;
         info->dli_saddr = (void *)(handle->load_bias + sym->st_value);
+        info->dli_ssize = sym->st_size;
     }
 
     return 1;

@@ -49,7 +49,7 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
 
     implementation project(':xdl')
-//    implementation 'io.hexhacking:xdl:1.1.0'
+//    implementation 'io.hexhacking:xdl:1.1.1'
 }
 
 // Bypass the compatibility issue between prefab and gradle-project-dependencies.
