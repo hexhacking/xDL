@@ -22,16 +22,19 @@
 #define LOG_END "*** --------------------------------------------------------------"
 
 #if defined(__LP64__)
-#define BASENAME_LINKER   "linker64"
-#define PATHNAME_LIBC     "/system/lib64/libc.so"
-#define PATHNAME_LIBC_Q   "/apex/com.android.runtime/lib64/bionic/libc.so"
-#define PATHNAME_LIBCPP   "/system/lib64/libc++.so"
+#define BASENAME_LINKER      "linker64"
+#define BASENAME_APP_PROCESS "app_process64"
+#define PATHNAME_LIBC        "/system/lib64/libc.so"
+#define PATHNAME_LIBC_Q      "/apex/com.android.runtime/lib64/bionic/libc.so"
+#define PATHNAME_LIBCPP      "/system/lib64/libc++.so"
 #else
-#define BASENAME_LINKER   "linker"
-#define PATHNAME_LIBC     "/system/lib/libc.so"
-#define PATHNAME_LIBC_Q   "/apex/com.android.runtime/lib/bionic/libc.so"
-#define PATHNAME_LIBCPP   "/system/lib/libc++.so"
+#define BASENAME_LINKER      "linker"
+#define BASENAME_APP_PROCESS "app_process32"
+#define PATHNAME_LIBC        "/system/lib/libc.so"
+#define PATHNAME_LIBC_Q      "/apex/com.android.runtime/lib/bionic/libc.so"
+#define PATHNAME_LIBCPP      "/system/lib/libc++.so"
 #endif
+#define BASENAME_VDSO        "[vdso]"
 #define BASENAME_LIBNETUTILS "libnetutils.so"
 #define BASENAME_LIBCAP      "libcap.so"
 
@@ -53,18 +56,8 @@ static void sample_test_iterate(void)
     LOG(LOG_END);
     usleep(100 * 1000);
 
-    LOG("+++ xdl_iterate_phdr(XDL_WITH_LINKER)");
-    xdl_iterate_phdr(callback, NULL, XDL_WITH_LINKER);
-    LOG(LOG_END);
-    usleep(100 * 1000);
-
     LOG("+++ xdl_iterate_phdr(XDL_FULL_PATHNAME)");
     xdl_iterate_phdr(callback, NULL, XDL_FULL_PATHNAME);
-    LOG(LOG_END);
-    usleep(100 * 1000);
-
-    LOG("+++ xdl_iterate_phdr(XDL_WITH_LINKER | XDL_FULL_PATHNAME)");
-    xdl_iterate_phdr(callback, NULL, XDL_WITH_LINKER | XDL_FULL_PATHNAME);
     LOG(LOG_END);
     usleep(100 * 1000);
 }
@@ -121,6 +114,12 @@ static void sample_test(JNIEnv *env, jobject thiz)
 
     // linker
     sample_test_dlsym(BASENAME_LINKER, "__dl__ZL10g_dl_mutex", true, &cache, false);
+
+    // app_process
+    sample_test_dlsym(BASENAME_APP_PROCESS, "sigaction", false, &cache, false);
+
+    // vDSO
+    sample_test_dlsym(BASENAME_VDSO, "__kernel_rt_sigreturn", false, &cache, false);
 
     // libc.so
     sample_test_dlsym(PATHNAME_LIBC_FIXED, "android_set_abort_message", false, &cache, false);

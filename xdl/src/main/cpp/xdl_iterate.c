@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
+#include <sys/auxv.h>
 #include <android/api-level.h>
 #include "xdl_iterate.h"
 #include "xdl.h"
@@ -47,26 +48,15 @@
  * 19         4.4              /proc/self/maps
  * 20         4.4W             /proc/self/maps
  * ---------------------------------------------------------------------------------------------------------
- * 21         5.0              dl_iterate_phdr() + __dl__ZL10g_dl_mutex + linker/linker64 in /proc/self/maps
- * 22         5.1              dl_iterate_phdr() + __dl__ZL10g_dl_mutex + linker/linker64 in /proc/self/maps
+ * 21         5.0              dl_iterate_phdr() + __dl__ZL10g_dl_mutex + linker/linker64 from getauxval(3)
+ * 22         5.1              dl_iterate_phdr() + __dl__ZL10g_dl_mutex + linker/linker64 from getauxval(3)
  * ---------------------------------------------------------------------------------------------------------
- * 23         6.0              dl_iterate_phdr() + linker/linker64 in /proc/self/maps
- * 24         7.0              dl_iterate_phdr() + linker/linker64 in /proc/self/maps
- * 25         7.1              dl_iterate_phdr() + linker/linker64 in /proc/self/maps
- * 26         8.0              dl_iterate_phdr() + linker/linker64 in /proc/self/maps
- * ---------------------------------------------------------------------------------------------------------
- * >= 27      >= 8.1           dl_iterate_phdr()
+ * 23         >= 6.0           dl_iterate_phdr() + linker/linker64 from getauxval(3)
  * =========================================================================================================
  */
 
-// we only use this when Android < 8.1
-#ifndef __LP64__
-#define XDL_ITERATE_LINKER_PATHNAME "/system/bin/linker"
-#else
-#define XDL_ITERATE_LINKER_PATHNAME "/system/bin/linker64"
-#endif
-
 extern __attribute((weak)) int dl_iterate_phdr(int (*)(struct dl_phdr_info *, size_t, void *), void *);
+extern __attribute((weak)) unsigned long int getauxval(unsigned long int);
 
 static uintptr_t xdl_iterate_get_min_vaddr(struct dl_phdr_info *info)
 {
@@ -171,32 +161,15 @@ static int xdl_iterate_by_linker_cb(struct dl_phdr_info *info, size_t size, void
     return cb(info, size, cb_arg);
 }
 
-static uintptr_t xdl_iterate_find_linker_base(FILE **maps)
+static uintptr_t xdl_iterate_get_linker_base(void)
 {
-    // open or rewind maps-file
-    if(0 != xdl_iterate_open_or_rewind_maps(maps)) return 0; // failed
+    if(NULL == getauxval) return 0;
 
-    size_t linker_pathname_len = strlen(" "XDL_ITERATE_LINKER_PATHNAME);
+    uintptr_t base = (uintptr_t)getauxval(AT_BASE);
+    if(0 == base) return 0;
+    if(0 != memcmp((void *)base, ELFMAG, SELFMAG)) return 0;
 
-    char line[1024];
-    while(fgets(line, sizeof(line), *maps))
-    {
-        // check pathname
-        size_t line_len = xdl_util_trim_ending(line);
-        if(line_len < linker_pathname_len)continue;
-        if(0 != memcmp(line + line_len - linker_pathname_len, " "XDL_ITERATE_LINKER_PATHNAME, linker_pathname_len)) continue;
-
-        // get base address
-        uintptr_t base, offset;
-        if(2 != sscanf(line, "%"SCNxPTR"-%*"SCNxPTR" r-xp %"SCNxPTR" ", &base, &offset)) continue;
-        if(0 != offset) continue;
-        if(0 != memcmp((void *)base, ELFMAG, SELFMAG)) continue;
-
-        // find it
-        return base;
-    }
-
-    return 0;
+    return base;
 }
 
 static int xdl_iterate_do_callback(xdl_iterate_phdr_cb_t cb, void *cb_arg, uintptr_t base, const char *pathname, uintptr_t *load_bias)
@@ -225,15 +198,13 @@ static int xdl_iterate_by_linker(xdl_iterate_phdr_cb_t cb, void *cb_arg, int fla
     FILE *maps = NULL;
     int r;
 
-    // for linker/linker64 in Android version < 8.1 (API level 27)
-    uintptr_t linker_base = 0, linker_load_bias = 0;
-    if((flags & XDL_WITH_LINKER) && api_level < __ANDROID_API_O_MR1__)
+    // dl_iterate_phdr(3) does NOT contain linker/linker64 when Android version < 8.1 (API level 27)
+    // Here we always try to get linker base address from auxv.
+    uintptr_t linker_load_bias = 0;
+    uintptr_t linker_base = xdl_iterate_get_linker_base();
+    if(0 != linker_base)
     {
-        linker_base = xdl_iterate_find_linker_base(&maps);
-        if(0 != linker_base)
-        {
-            if(0 != (r = xdl_iterate_do_callback(cb, cb_arg, linker_base, XDL_ITERATE_LINKER_PATHNAME, &linker_load_bias))) return r;
-        }
+        if(0 != (r = xdl_iterate_do_callback(cb, cb_arg, linker_base, XDL_UTIL_LINKER_PATHNAME, &linker_load_bias))) return r;
     }
 
     // for other ELF

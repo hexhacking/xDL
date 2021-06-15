@@ -29,12 +29,6 @@
 #include "xdl.h"
 #include "xdl_util.h"
 
-#ifndef __LP64__
-#define XDL_LINKER_BASENAME "linker"
-#else
-#define XDL_LINKER_BASENAME "linker64"
-#endif
-
 #define XDL_LINKER_SYM_MUTEX         "__dl__ZL10g_dl_mutex"
 #define XDL_LINKER_SYM_DLOPEN_EXT_N  "__dl__ZL10dlopen_extPKciPK17android_dlextinfoPv"
 #define XDL_LINKER_SYM_DO_DLOPEN_N   "__dl__Z9do_dlopenPKciPK17android_dlextinfoPv"
@@ -57,7 +51,7 @@ static void xdl_linker_init(void)
     if(inited) return;
     inited = true;
 
-    void *handle = xdl_open(XDL_LINKER_BASENAME, XDL_DEFAULT);
+    void *handle = xdl_open(XDL_UTIL_LINKER_BASENAME, XDL_DEFAULT);
     if(NULL == handle) return;
 
     int api_level = xdl_util_get_api_level();
@@ -79,7 +73,7 @@ static void xdl_linker_init(void)
     }
     else if(api_level >= __ANDROID_API_P__)
     {
-        // >= Android 8.0
+        // >= Android 9.0
         xdl_linker_loader_dlopen = (xdl_linker_loader_dlopen_t)xdl_sym(handle, XDL_LINKER_SYM_LOADER_DLOPEN, NULL);
     }
 

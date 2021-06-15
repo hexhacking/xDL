@@ -76,8 +76,7 @@ void xdl_addr_clean(void **cache);
 //
 // Enhanced dl_iterate_phdr().
 //
-#define XDL_WITH_LINKER   0x01
-#define XDL_FULL_PATHNAME 0x02
+#define XDL_FULL_PATHNAME 0x01
 int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data, int flags);
 
 #ifdef __cplusplus

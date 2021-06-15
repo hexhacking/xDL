@@ -36,6 +36,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/prctl.h>
+#include <sys/auxv.h>
 #include <android/api-level.h>
 #include "xdl.h"
 #include "xdl_iterate.h"
@@ -43,14 +44,10 @@
 #include "xdl_lzma.h"
 #include "xdl_linker.h"
 
-#ifndef __LP64__
-#define XDL_LINKER_BASENAME "linker"
-#else
-#define XDL_LINKER_BASENAME "linker64"
-#endif
-
 #define XDL_DYNSYM_IS_EXPORT_SYM(shndx) (SHN_UNDEF != (shndx))
 #define XDL_SYMTAB_IS_EXPORT_SYM(shndx) (SHN_UNDEF != (shndx) && !((shndx) >= SHN_LORESERVE && (shndx) <= SHN_HIRESERVE))
+
+extern __attribute((weak)) unsigned long int getauxval(unsigned long int);
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wpadded"
@@ -238,7 +235,7 @@ static int xdl_symtab_load_from_debugdata(xdl_t *self, int file_fd, size_t file_
     char *shstrtab = (char *)xdl_read_memory_by_section(self->debugdata, debugdata_sz, shdrs + ehdr->e_shstrndx);
     if(NULL == shstrtab) goto end;
 
-    // lookup .symtab & .strtab
+    // find .symtab & .strtab
     for(ElfW(Shdr) *shdr = shdrs; shdr < shdrs + ehdr->e_shnum; shdr++)
     {
         char *shdr_name = shstrtab + shdr->sh_name;
@@ -316,7 +313,7 @@ static int xdl_symtab_load(xdl_t *self)
     shstrtab = (char *)xdl_read_file_to_heap_by_section(file_fd, file_sz, shdrs + ehdr->e_shstrndx);
     if(NULL == shstrtab) goto end;
 
-    // lookup .symtab & .strtab
+    // find .symtab & .strtab
     for(ElfW(Shdr) *shdr = shdrs; shdr < shdrs + ehdr->e_shnum; shdr++)
     {
         char *shdr_name = shstrtab + shdr->sh_name;
@@ -364,6 +361,51 @@ static int xdl_symtab_load(xdl_t *self)
     return r;
 }
 
+static xdl_t *xdl_find_from_auxv(unsigned long type, const char *pathname)
+{
+    if(NULL == getauxval) return NULL;
+
+    uintptr_t val = (uintptr_t)getauxval(type);
+    if(0 == val) return NULL;
+
+    // get base
+    uintptr_t base = (AT_PHDR == type ? (val & (~0xffful)) : val);
+    if(0 != memcmp((void *)base, ELFMAG, SELFMAG)) return NULL;
+
+    // ELF info
+    ElfW(Ehdr) *ehdr = (ElfW(Ehdr) *)base;
+    const ElfW(Phdr) *dlpi_phdr = (const ElfW(Phdr) *)(base + ehdr->e_phoff);
+    ElfW(Half) dlpi_phnum = ehdr->e_phnum;
+
+    // get bias
+    uintptr_t min_vaddr = UINTPTR_MAX;
+    for(size_t i = 0; i < dlpi_phnum; i++)
+    {
+        const ElfW(Phdr) *phdr = &(dlpi_phdr[i]);
+        if(PT_LOAD == phdr->p_type)
+        {
+            if(min_vaddr > phdr->p_vaddr) min_vaddr = phdr->p_vaddr;
+        }
+    }
+    if(UINTPTR_MAX == min_vaddr || base < min_vaddr) return NULL;
+    uintptr_t load_bias = base - min_vaddr;
+
+    // create xDL object
+    xdl_t *self;
+    if(NULL == (self = calloc(1, sizeof(xdl_t)))) return NULL;
+    if(NULL == (self->pathname = strdup(pathname)))
+    {
+        free(self);
+        return NULL;
+    }
+    self->load_bias = load_bias;
+    self->dlpi_phdr = dlpi_phdr;
+    self->dlpi_phnum = dlpi_phnum;
+    self->dynsym_try_load = false;
+    self->symtab_try_load = false;
+    return self;
+}
+
 static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg)
 {
     (void)size;
@@ -405,15 +447,21 @@ static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg
     return 1; // OK
 }
 
-static xdl_t *xdl_lookup(const char *filename)
+static xdl_t *xdl_find(const char *filename)
 {
+    // from auxv
     xdl_t *self = NULL;
+    if(xdl_util_ends_with(filename, XDL_UTIL_LINKER_BASENAME))
+        self = xdl_find_from_auxv(AT_BASE, XDL_UTIL_LINKER_PATHNAME);
+    else if(xdl_util_ends_with(filename, XDL_UTIL_APP_PROCESS_BASENAME))
+        self = xdl_find_from_auxv(AT_PHDR, XDL_UTIL_APP_PROCESS_PATHNAME);
+    else if(xdl_util_ends_with(filename, XDL_UTIL_VDSO_BASENAME))
+        self = xdl_find_from_auxv(AT_SYSINFO_EHDR, XDL_UTIL_VDSO_BASENAME);
+    if(NULL != self) return self;
+
+    // from dl_iterate_phdr
     uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)filename};
-
-    int iterate_flags = XDL_FULL_PATHNAME;
-    if(xdl_util_ends_with(filename, XDL_LINKER_BASENAME)) iterate_flags |= XDL_WITH_LINKER;
-    xdl_iterate_phdr(xdl_find_iterate_cb, pkg, iterate_flags);
-
+    xdl_iterate_phdr(xdl_find_iterate_cb, pkg, XDL_FULL_PATHNAME);
     return self;
 }
 
@@ -423,8 +471,8 @@ static void *xdl_open_always_force(const char *filename)
     void *linker_handle = xdl_linker_load(filename);
     if(NULL == linker_handle) return NULL;
 
-    // lookup
-    xdl_t *self = xdl_lookup(filename);
+    // find
+    xdl_t *self = xdl_find(filename);
     if(NULL == self)
         dlclose(linker_handle);
     else
@@ -435,16 +483,16 @@ static void *xdl_open_always_force(const char *filename)
 
 static void *xdl_open_try_force(const char *filename)
 {
-    // lookup
-    xdl_t *self = xdl_lookup(filename);
+    // find
+    xdl_t *self = xdl_find(filename);
     if(NULL != self) return (void *)self;
 
     // try force dlopen()
     void *linker_handle = xdl_linker_load(filename);
     if(NULL == linker_handle) return NULL;
 
-    // lookup again
-    self = xdl_lookup(filename);
+    // find again
+    self = xdl_find(filename);
     if(NULL == self)
         dlclose(linker_handle);
     else
@@ -462,7 +510,7 @@ void *xdl_open(const char *filename, int flags)
     else if(flags & XDL_TRY_FORCE_LOAD)
         return xdl_open_try_force(filename);
     else
-        return xdl_lookup(filename);
+        return xdl_find(filename);
 }
 
 void *xdl_close(void *handle)
@@ -680,7 +728,7 @@ static void *xdl_open_by_addr(void *addr)
 
     xdl_t *self = NULL;
     uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)addr};
-    xdl_iterate_phdr(xdl_open_by_addr_iterate_cb, pkg, XDL_FULL_PATHNAME | XDL_WITH_LINKER);
+    xdl_iterate_phdr(xdl_open_by_addr_iterate_cb, pkg, XDL_FULL_PATHNAME);
 
     return (void *)self;
 }
@@ -712,7 +760,7 @@ static ElfW(Sym) *xdl_sym_by_addr(void *handle, void * addr)
         if(0 != xdl_dynsym_load(self)) return NULL;
     }
 
-    // lookup symbol
+    // find symbol
     if(NULL == self->dynsym) return NULL;
     uintptr_t offset = (uintptr_t)addr - self->load_bias;
     if(self->gnu_hash.buckets_cnt > 0)
@@ -751,7 +799,7 @@ static ElfW(Sym) *xdl_dsym_by_addr(void *handle, void * addr)
         if(0 != xdl_symtab_load(self)) return NULL;
     }
 
-    // lookup symbol
+    // find symbol
     if(NULL == self->symtab) return NULL;
     uintptr_t offset = (uintptr_t)addr - self->load_bias;
     for(size_t i = 0; i < self->symtab_cnt; i++)
@@ -769,7 +817,7 @@ int xdl_addr(void *addr, xdl_info *info, void **cache)
 
     memset(info, 0, sizeof(Dl_info));
 
-    // lookup handle from cache
+    // find handle from cache
     xdl_t *handle = NULL;
     for(handle = *((xdl_t **)cache); NULL != handle; handle = handle->next)
         if(xdl_elf_is_match(handle->load_bias, handle->dlpi_phdr, handle->dlpi_phnum, (uintptr_t)addr))

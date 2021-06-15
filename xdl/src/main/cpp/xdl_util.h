@@ -28,9 +28,18 @@
 #include <stdbool.h>
 #include <errno.h>
 
-#ifdef __cplusplus
-extern "C" {
+#ifndef __LP64__
+#define XDL_UTIL_LINKER_BASENAME      "linker"
+#define XDL_UTIL_LINKER_PATHNAME      "/system/bin/linker"
+#define XDL_UTIL_APP_PROCESS_BASENAME "app_process32"
+#define XDL_UTIL_APP_PROCESS_PATHNAME "/system/bin/app_process32"
+#else
+#define XDL_UTIL_LINKER_BASENAME      "linker64"
+#define XDL_UTIL_LINKER_PATHNAME      "/system/bin/linker64"
+#define XDL_UTIL_APP_PROCESS_BASENAME "app_process64"
+#define XDL_UTIL_APP_PROCESS_PATHNAME "/system/bin/app_process64"
 #endif
+#define XDL_UTIL_VDSO_BASENAME        "[vdso]"
 
 #define XDL_UTIL_TEMP_FAILURE_RETRY(exp) ({ \
     __typeof__(exp) _rc;                    \
@@ -39,6 +48,10 @@ extern "C" {
         _rc = (exp);                        \
     } while (_rc == -1 && errno == EINTR);  \
     _rc; })
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 bool xdl_util_starts_with(const char *str, const char *start);
 bool xdl_util_ends_with(const char* str, const char* ending);
