@@ -449,14 +449,30 @@ static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg
 
 static xdl_t *xdl_find(const char *filename)
 {
-    // from auxv
+    // from auxv (linker, vDSO)
     xdl_t *self = NULL;
     if(xdl_util_ends_with(filename, XDL_UTIL_LINKER_BASENAME))
         self = xdl_find_from_auxv(AT_BASE, XDL_UTIL_LINKER_PATHNAME);
-    else if(xdl_util_ends_with(filename, XDL_UTIL_APP_PROCESS_BASENAME))
-        self = xdl_find_from_auxv(AT_PHDR, XDL_UTIL_APP_PROCESS_PATHNAME);
     else if(xdl_util_ends_with(filename, XDL_UTIL_VDSO_BASENAME))
         self = xdl_find_from_auxv(AT_SYSINFO_EHDR, XDL_UTIL_VDSO_BASENAME);
+
+    // from auxv (app_process)
+    const char *basename, *pathname;
+#if (defined(__arm__) || defined(__i386__)) && __ANDROID_API__ < __ANDROID_API_L__
+    if(xdl_util_get_api_level() < __ANDROID_API_L__)
+    {
+        basename = XDL_UTIL_APP_PROCESS_BASENAME_K;
+        pathname = XDL_UTIL_APP_PROCESS_PATHNAME_K;
+    }
+    else
+#endif
+    {
+        basename = XDL_UTIL_APP_PROCESS_BASENAME;
+        pathname = XDL_UTIL_APP_PROCESS_PATHNAME;
+    }
+    if(xdl_util_ends_with(filename, basename))
+        self = xdl_find_from_auxv(AT_PHDR, pathname);
+
     if(NULL != self) return self;
 
     // from dl_iterate_phdr

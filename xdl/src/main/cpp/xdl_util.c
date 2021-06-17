@@ -48,9 +48,9 @@ bool xdl_util_ends_with(const char* str, const char* ending)
     size_t str_len = strlen(str);
     size_t ending_len = strlen(ending);
 
-    if(ending_len > str_len) return 0;
+    if(ending_len > str_len) return false;
 
-    return 0 == strcmp(str + (str_len - ending_len), ending) ? true : false;
+    return 0 == strcmp(str + (str_len - ending_len), ending);
 }
 
 size_t xdl_util_trim_ending(char *start)

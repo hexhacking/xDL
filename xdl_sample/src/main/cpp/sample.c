@@ -44,8 +44,7 @@ static int callback(struct dl_phdr_info *info, size_t size, void *arg)
 {
     (void)size, (void)arg;
 
-    LOG(">>> %"PRIxPTR" %s", (uintptr_t)info->dlpi_addr, info->dlpi_name);
-
+    LOG(">>> %"PRIxPTR" %s (phdr: %"PRIxPTR", phnum: %zu)", (uintptr_t)info->dlpi_addr, info->dlpi_name, (uintptr_t)info->dlpi_phdr, (size_t)info->dlpi_phnum);
     return 0;
 }
 
