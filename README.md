@@ -142,7 +142,7 @@ void *xdl_open(const char *filename, int flags);
 void *xdl_close(void *handle);
 ```
 
-They are very similar to `dlopen()` and `dlclose()`. But `xdl_open()` can bypass the restrictions of Android 7.0+ linker namespace.
+They are very similar to [`dlopen()`](https://man7.org/linux/man-pages/man3/dlopen.3.html) and [`dlclose()`](https://man7.org/linux/man-pages/man3/dlclose.3.html). But `xdl_open()` can bypass the restrictions of Android 7.0+ linker namespace.
 
 Depending on the value of the `flags` parameter, the behavior of `xdl_open()` will have some differences:
 
@@ -176,7 +176,7 @@ void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size);
 void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size);
 ```
 
-They are very similar to `dlsym()`. They all takes a "handle" of an ELF returned by `xdl_open()` and the null-terminated symbol name, returning the address where that symbol is loaded into memory.
+They are very similar to [`dlsym()`](https://man7.org/linux/man-pages/man3/dlsym.3.html). They all takes a "handle" of an ELF returned by `xdl_open()` and the null-terminated symbol name, returning the address where that symbol is loaded into memory.
 
 If the `symbol_size` parameter is not `NULL`, it will be assigned as "the bytes occupied by the content corresponding to the symbol in the ELF". If you don't need this information, just pass `NULL`.
 
@@ -193,18 +193,30 @@ Notice:
 ### 3. `xdl_addr()`
 
 ```C
-int xdl_addr(void *addr, Dl_info *info, void **cache);
+typedef struct
+{
+    const char       *dli_fname;
+    void             *dli_fbase;
+    const char       *dli_sname;
+    void             *dli_saddr;
+    size_t            dli_ssize;
+    const ElfW(Phdr) *dlpi_phdr;
+    size_t            dlpi_phnum;
+} xdl_info;
+
+int xdl_addr(void *addr, xdl_info *info, void **cache);
 void xdl_addr_clean(void **cache);
 ```
 
-`xdl_addr()` is similar to `dladdr()`. But there are a few differences:
+`xdl_addr()` is similar to [`dladdr()`](https://man7.org/linux/man-pages/man3/dladdr.3.html). But there are a few differences:
 
 * `xdl_addr()` can lookup not only dynamic link symbols, but also debugging symbols. 
+* `xdl_addr()` uses the `xdl_info` structure instead of the `Dl_info` structure, which contains more extended information: `dli_ssize` is the number of bytes occupied by the current symbol; `dlpi_phdr` points to the program headers array of the ELF where the current symbol is located; `dlpi_phnum` is the number of elements in the `dlpi_phdr` array.
 * `xdl_addr()` needs to pass an additional parameter (`cache`), which will cache the ELF handle opened during the execution of `xdl_addr()`. The purpose of caching is to make subsequent executions of `xdl_addr()` of the same ELF faster. When you do not need to execute `xdl_addr()`, please use `xdl_addr_clean()` to clear the cache. For example:
 
 ```C
 void *cache = NULL;
-Dl_info info;
+xdl_info info;
 xdl_addr(addr_1, &info, &cache);
 xdl_addr(addr_2, &info, &cache);
 xdl_addr(addr_3, &info, &cache);
@@ -215,18 +227,16 @@ xdl_addr_clean(&cache);
 
 ```C
 #define XDL_DEFAULT       0x00
-#define XDL_WITH_LINKER   0x01
-#define XDL_FULL_PATHNAME 0x02
+#define XDL_FULL_PATHNAME 0x01
 
 int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data, int flags);
 ```
 
-`xdl_iterate_phdr()` is similar to `dl_iterate_phdr()`. But `xdl_iterate_phdr()` is compatible with android 4.x on ARM32.
+`xdl_iterate_phdr()` is similar to [`dl_iterate_phdr()`](https://man7.org/linux/man-pages/man3/dl_iterate_phdr.3.html). But `xdl_iterate_phdr()` is compatible with android 4.x on ARM32, and always including linker / linker64.
 
 `xdl_iterate_phdr()` has an additional "flags" parameter, one or more flags can be bitwise-or'd in it:
 
 * `XDL_DEFAULT`: Default behavior.
-* `XDL_WITH_LINKER`: Always including linker / linker64.
 * `XDL_FULL_PATHNAME`: Always return full pathname instead of basename.
 
 These flags are needed because these capabilities require additional execution time, and you don't always need them.

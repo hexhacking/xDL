@@ -142,7 +142,7 @@ void *xdl_open(const char *filename, int flags);
 void *xdl_close(void *handle);
 ```
 
-它们和 `dlopen()` / `dlclose()` 很相似。但是 `xdl_open()` 可以绕过 Android 7.0+ linker namespace 的限制。
+它们和 [`dlopen()`](https://man7.org/linux/man-pages/man3/dlopen.3.html) / [`dlclose()`](https://man7.org/linux/man-pages/man3/dlclose.3.html) 很相似。但是 `xdl_open()` 可以绕过 Android 7.0+ linker namespace 的限制。
 
 根据 `flags` 参数值的不同，`xdl_open()` 的行为会有一些差异：
 
@@ -176,7 +176,7 @@ void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size);
 void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size);
 ```
 
-它们和 `dlsym()` 很相似。 它们都需要传递一个 `xdl_open()` 返回的 “handle”，和一个 null 结尾的符号名字，返回该符号在内存中的加载地址。
+它们和 [`dlsym()`](https://man7.org/linux/man-pages/man3/dlsym.3.html) 很相似。 它们都需要传递一个 `xdl_open()` 返回的 “handle”，和一个 null 结尾的符号名字，返回该符号在内存中的加载地址。
 
 如果 `symbol_size` 参数不为 `NULL`，它将被赋值为“符号对应的内容在 ELF 中占用的字节数”，如果你不需要这个信息，传递 `NULL` 就可以了。
 
@@ -193,13 +193,25 @@ void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size);
 ### 3. `xdl_addr()`
 
 ```C
-int xdl_addr(void *addr, Dl_info *info, void **cache);
+typedef struct
+{
+    const char       *dli_fname;
+    void             *dli_fbase;
+    const char       *dli_sname;
+    void             *dli_saddr;
+    size_t            dli_ssize;
+    const ElfW(Phdr) *dlpi_phdr;
+    size_t            dlpi_phnum;
+} xdl_info;
+
+int xdl_addr(void *addr, xdl_info *info, void **cache);
 void xdl_addr_clean(void **cache);
 ```
 
-`xdl_addr()` 和 `dladdr()` 很相似。但有以下几点不同：
+`xdl_addr()` 和 [`dladdr()`](https://man7.org/linux/man-pages/man3/dladdr.3.html) 很相似。但有以下几点不同：
 
 * `xdl_addr()` 不仅能查询动态链接符号，还能查询调试符号。
+*  `xdl_addr()` 使用 `dl_info` 结构体代替了 `Dl_info` 结构体，它包含了更多的扩展信息：`dli_ssize` 是当前符号所占用的字节数；`dlpi_phdr` 指向当前符号所在 ELF 的 program headers 数组；`dlpi_phnum` 是 `dlpi_phdr` 数组的元素个数。
 * `xdl_addr()` 需要传递一个附加的参数（cache），其中会缓存 `xdl_addr()` 执行过程中打开的 ELF handle，缓存的目的是使后续对同一个 ELF 的 `xdl_addr()` 执行的更快。当不需要再执行 `xdl_addr()` 时，请使用 `xdl_addr_clean()` 清除缓存。举例：
 
 ```C
@@ -215,18 +227,16 @@ xdl_addr_clean(&cache);
 
 ```C
 #define XDL_DEFAULT       0x00
-#define XDL_WITH_LINKER   0x01
-#define XDL_FULL_PATHNAME 0x02
+#define XDL_FULL_PATHNAME 0x01
 
 int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), void *data, int flags);
 ```
 
-`xdl_iterate_phdr()` 和 `dl_iterate_phdr()` 很相似。但是 `xdl_iterate_phdr()` 兼容 ARM32 平台的 Android 4.x 系统。
+`xdl_iterate_phdr()` 和 [`dl_iterate_phdr()`](https://man7.org/linux/man-pages/man3/dl_iterate_phdr.3.html) 很相似。但是 `xdl_iterate_phdr()` 兼容 ARM32 平台的 Android 4.x 系统，并且总是包含 linker / linker64。
 
 `xdl_iterate_phdr()` 有一个额外的“flags”参数，一个或多个“flag”可以按位“或”后传递给它:
 
 * `XDL_DEFAULT`: 默认行为。
-* `XDL_WITH_LINKER`: 总是包含 linker / linker64。
 * `XDL_FULL_PATHNAME`: 总是返回完整的路径名（full pathname），而不是文件名（basename）。
 
 需要这些 flags 的原因是，这些额外的能力也需要花费额外的执行时间，而你并不总是需要这些能力。
