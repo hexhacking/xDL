@@ -1,4 +1,6 @@
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
 
 android {
     compileSdkVersion rootProject.ext.compileSdkVersion
@@ -12,6 +14,14 @@ android {
         versionName "1.0"
         ndk {
             abiFilters rootProject.ext.abiFilters.split(",")
+        }
+        externalNativeBuild {
+            cmake {
+                abiFilters rootProject.ext.abiFilters.split(",")
+                if (rootProject.ext.dependencyOnLocalLibrary) {
+                    arguments "-DDEPENDENCY_ON_LOCAL_LIBRARY=ON"
+                }
+            }
         }
     }
     externalNativeBuild {
@@ -35,31 +45,28 @@ android {
             minifyEnabled false
         }
     }
-    buildFeatures {
-        prefab true
+    if (!rootProject.ext.dependencyOnLocalLibrary) {
+        buildFeatures {
+            prefab true
+        }
     }
     packagingOptions {
         pickFirst '**/libxdl.so'
     }
+    lintOptions {
+        abortOnError false
+    }
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.3.0'
-    implementation 'com.google.android.material:material:1.3.0'
+    implementation 'androidx.appcompat:appcompat:1.3.1'
+    implementation 'com.google.android.material:material:1.4.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
 
-    implementation project(':xdl')
-//    implementation 'io.hexhacking:xdl:1.1.1'
-}
-
-// Bypass the compatibility issue between prefab and gradle-project-dependencies.
-// Note: This is not required for gradle-maven-dependencies.
-tasks.whenTaskAdded { task ->
-    if (task.name == 'generateJsonModelDebug') {
-        task.dependsOn(':xdl:prefabDebugPackage')
-    }
-    else if (task.name == 'generateJsonModelRelease') {
-        task.dependsOn(':xdl:prefabReleasePackage')
+    if (rootProject.ext.dependencyOnLocalLibrary) {
+        implementation project(':xdl')
+    } else {
+        implementation 'io.hexhacking:xdl:1.1.1'
     }
 }
 

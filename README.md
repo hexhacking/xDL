@@ -3,7 +3,7 @@
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/release-1.1.1-red.svg?style=flat)
-![](https://img.shields.io/badge/Android-4.1%20--%2011-blue.svg?style=flat)
+![](https://img.shields.io/badge/Android-4.1%20--%2012-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
 xDL is an enhanced implementation of the Android DL series functions.
@@ -22,7 +22,7 @@ xDL is an enhanced implementation of the Android DL series functions.
     * Including linker / linker64 (for Android <= 8.x).
     * Return full pathname instead of basename (for Android 5.x).
     * Return app\_process32 / app\_process64 instead of package name.
-* Support Android 4.1 - 11 (API level 16 - 30).
+* Support Android 4.1 - 12 (API level 16 - 31).
 * Support armeabi-v7a, arm64-v8a, x86 and x86_64.
 * MIT licensed.
 
@@ -33,10 +33,10 @@ If xDL is compiled into an independent dynamic library:
 
 | ABI         | Compressed (KB) | Uncompressed (KB) |
 | :---------- | --------------: | ----------------: |
-| armeabi-v7a | 6.8             | 13.9              |
-| arm64-v8a   | 7.5             | 18.3              |
-| x86         | 7.7             | 17.9              |
-| x86_64      | 7.9             | 18.6              |
+| armeabi-v7a | 6.8             | 12.0              |
+| arm64-v8a   | 7.6             | 16.2              |
+| x86         | 7.8             | 15.1              |
+| x86_64      | 7.8             | 16.6              |
 
 
 ## Usage

@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.2.1'
+        classpath 'com.android.tools.build:gradle:7.0.0'
     }
 }
 
@@ -22,14 +22,15 @@ task clean(type: Delete) {
 
 ext {
     minSdkVersion = 16
-    compileSdkVersion = 30
-    targetSdkVersion = 30
-    buildToolsVersion = "30.0.3"
+    compileSdkVersion = 31
+    targetSdkVersion = 31
+    buildToolsVersion = "31.0.0"
     javaVersion = JavaVersion.VERSION_1_7
-    ndkVersion = "21.4.7075529"
+    ndkVersion = "22.1.7171670"
     cmakeVersion = "3.18.1"
     abiFilters = "armeabi-v7a,arm64-v8a,x86,x86_64"
     useASAN = false
+    dependencyOnLocalLibrary = true
 
     POM_GROUP_ID = "io.hexhacking"
     POM_ARTIFACT_ID = "xdl"
