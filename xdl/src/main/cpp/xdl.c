@@ -414,37 +414,51 @@ static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg
     xdl_t **self = (xdl_t **)*pkg++;
     const char *filename = (const char *)*pkg;
 
-    // check load_bias and pathname
+    // check load_bias
     if(0 == info->dlpi_addr || NULL == info->dlpi_name) return 0;
-    if('/' == filename[0] || '[' == filename[0])
+
+    // check pathname
+    if('[' == filename[0])
     {
-        // full pathname
         if(0 != strcmp(info->dlpi_name, filename)) return 0;
+    }
+    else if('/' == filename[0])
+    {
+        if('/' == info->dlpi_name[0])
+        {
+            if(0 != strcmp(info->dlpi_name, filename)) return 0;
+        }
+        else
+        {
+            if(!xdl_util_ends_with(filename, info->dlpi_name)) return 0;
+        }
     }
     else
     {
-        // basename ?
-        size_t basename_len = strlen(filename);
-        size_t pathname_len = strlen(info->dlpi_name);
-        if(1 + basename_len > pathname_len) return 0;
-        if(0 != strcmp(info->dlpi_name + (pathname_len - basename_len), filename)) return 0;
-        if('/' != *(info->dlpi_name + (pathname_len - basename_len) - 1)) return 0;
+        if('/' == info->dlpi_name[0])
+        {
+            if(!xdl_util_ends_with(info->dlpi_name, filename)) return 0;
+        }
+        else
+        {
+            if(0 != strcmp(info->dlpi_name, filename)) return 0;
+        }
     }
 
     // found the target ELF
-    if(NULL == ((*self) = calloc(1, sizeof(xdl_t)))) return 1; // failed
+    if(NULL == ((*self) = calloc(1, sizeof(xdl_t)))) return 1; // return failed
     if(NULL == ((*self)->pathname = strdup(info->dlpi_name)))
     {
         free(*self);
         *self = NULL;
-        return 1; // failed
+        return 1; // return failed
     }
     (*self)->load_bias = info->dlpi_addr;
     (*self)->dlpi_phdr = info->dlpi_phdr;
     (*self)->dlpi_phnum = info->dlpi_phnum;
     (*self)->dynsym_try_load = false;
     (*self)->symtab_try_load = false;
-    return 1; // OK
+    return 1; // return OK
 }
 
 static xdl_t *xdl_find(const char *filename)
@@ -477,7 +491,7 @@ static xdl_t *xdl_find(const char *filename)
 
     // from dl_iterate_phdr
     uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)filename};
-    xdl_iterate_phdr(xdl_find_iterate_cb, pkg, XDL_FULL_PATHNAME);
+    xdl_iterate_phdr(xdl_find_iterate_cb, pkg, XDL_DEFAULT);
     return self;
 }
 
@@ -744,7 +758,7 @@ static void *xdl_open_by_addr(void *addr)
 
     xdl_t *self = NULL;
     uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)addr};
-    xdl_iterate_phdr(xdl_open_by_addr_iterate_cb, pkg, XDL_FULL_PATHNAME);
+    xdl_iterate_phdr(xdl_open_by_addr_iterate_cb, pkg, XDL_DEFAULT);
 
     return (void *)self;
 }

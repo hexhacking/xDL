@@ -229,7 +229,7 @@ static int xdl_iterate_by_maps(xdl_iterate_phdr_cb_t cb, void *cb_arg)
     {
         // Try to find an ELF which loaded by linker. This is almost always correct in android 4.x.
         uintptr_t base, offset;
-        if(2 != sscanf(line, "%"SCNxPTR"-%*"SCNxPTR" r-xp %"SCNxPTR" ", &base, &offset)) continue;
+        if(2 != sscanf(line, "%"SCNxPTR"-%*"SCNxPTR" r%*cxp %"SCNxPTR" ", &base, &offset)) continue;
         if(0 != offset) continue;
         if(0 != memcmp((void *)base, ELFMAG, SELFMAG)) continue;
 
