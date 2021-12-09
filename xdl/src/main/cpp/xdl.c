@@ -1,4 +1,4 @@
-// Copyright (c) 2020-present, HexHacking Team. All rights reserved.
+// Copyright (c) 2020-2021 HexHacking Team
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -98,8 +98,6 @@ typedef struct xdl
     bool       symtab_try_load;
     uintptr_t  base;
 
-    void      *debugdata; // decompressed .gnu_debugdata
-
     ElfW(Sym) *symtab;  // .symtab
     size_t     symtab_cnt;
     char      *strtab;  // .strtab
@@ -195,7 +193,25 @@ static void *xdl_read_file_to_heap_by_section(int file_fd, size_t file_sz, ElfW(
     return xdl_read_file_to_heap(file_fd, file_sz, (size_t)shdr->sh_offset, shdr->sh_size);
 }
 
-static void *xdl_read_memory(void *mem, size_t mem_sz, size_t data_offset, size_t data_len)
+static void *xdl_read_memory_to_heap(void *mem, size_t mem_sz, size_t data_offset, size_t data_len)
+{
+    if(0 == data_len) return NULL;
+    if(data_offset >= mem_sz) return NULL;
+    if(data_offset + data_len > mem_sz) return NULL;
+
+    void *data = malloc(data_len);
+    if(NULL == data) return NULL;
+
+    memcpy(data, (void *)((uintptr_t)mem + data_offset), data_len);
+    return data;
+}
+
+static void *xdl_read_memory_to_heap_by_section(void *mem, size_t mem_sz, ElfW(Shdr) *shdr)
+{
+    return xdl_read_memory_to_heap(mem, mem_sz, (size_t)shdr->sh_offset, shdr->sh_size);
+}
+
+static void *xdl_get_memory(void *mem, size_t mem_sz, size_t data_offset, size_t data_len)
 {
     if(0 == data_len) return NULL;
     if(data_offset >= mem_sz) return NULL;
@@ -204,14 +220,16 @@ static void *xdl_read_memory(void *mem, size_t mem_sz, size_t data_offset, size_
     return (void *)((uintptr_t)mem + data_offset);
 }
 
-static void *xdl_read_memory_by_section(void *mem, size_t mem_sz, ElfW(Shdr) *shdr)
+static void *xdl_get_memory_by_section(void *mem, size_t mem_sz, ElfW(Shdr) *shdr)
 {
-    return xdl_read_memory(mem, mem_sz, (size_t)shdr->sh_offset, shdr->sh_size);
+    return xdl_get_memory(mem, mem_sz, (size_t)shdr->sh_offset, shdr->sh_size);
 }
 
 // load from disk and memory
 static int xdl_symtab_load_from_debugdata(xdl_t *self, int file_fd, size_t file_sz, ElfW(Shdr) *shdr_debugdata)
 {
+    void *debugdata = NULL;
+    ElfW(Shdr) *shdrs = NULL;
     int r = -1;
 
     // get zipped .gnu_debugdata
@@ -220,19 +238,19 @@ static int xdl_symtab_load_from_debugdata(xdl_t *self, int file_fd, size_t file_
 
     // get unzipped .gnu_debugdata
     size_t debugdata_sz;
-    if(0 != xdl_lzma_decompress(debugdata_zip, shdr_debugdata->sh_size, (uint8_t **)(&(self->debugdata)), &debugdata_sz)) goto end;
+    if(0 != xdl_lzma_decompress(debugdata_zip, shdr_debugdata->sh_size, (uint8_t **)&debugdata, &debugdata_sz)) goto end;
 
     // get ELF header
-    ElfW(Ehdr) *ehdr = (ElfW(Ehdr) *)self->debugdata;
+    ElfW(Ehdr) *ehdr = (ElfW(Ehdr) *)debugdata;
     if(0 == ehdr->e_shnum || ehdr->e_shentsize != sizeof(ElfW(Shdr))) goto end;
 
     // get section headers
-    ElfW(Shdr) *shdrs = (ElfW(Shdr) *)xdl_read_memory(self->debugdata, debugdata_sz, (size_t)ehdr->e_shoff, ehdr->e_shentsize * ehdr->e_shnum);
+    shdrs = (ElfW(Shdr) *)xdl_read_memory_to_heap(debugdata, debugdata_sz, (size_t)ehdr->e_shoff, ehdr->e_shentsize * ehdr->e_shnum);
     if(NULL == shdrs) goto end;
 
     // get .shstrtab
     if(SHN_UNDEF == ehdr->e_shstrndx || ehdr->e_shstrndx >= ehdr->e_shnum) goto end;
-    char *shstrtab = (char *)xdl_read_memory_by_section(self->debugdata, debugdata_sz, shdrs + ehdr->e_shstrndx);
+    char *shstrtab = (char *)xdl_get_memory_by_section(debugdata, debugdata_sz, shdrs + ehdr->e_shstrndx);
     if(NULL == shstrtab) goto end;
 
     // find .symtab & .strtab
@@ -248,10 +266,14 @@ static int xdl_symtab_load_from_debugdata(xdl_t *self, int file_fd, size_t file_
             if(SHT_STRTAB != shdr_strtab->sh_type) continue;
 
             // get .symtab & .strtab
-            ElfW(Sym) *symtab = (ElfW(Sym) *)xdl_read_memory_by_section(self->debugdata, debugdata_sz, shdr);
+            ElfW(Sym) *symtab = (ElfW(Sym) *)xdl_read_memory_to_heap_by_section(debugdata, debugdata_sz, shdr);
             if(NULL == symtab) continue;
-            char *strtab = (char *)xdl_read_memory_by_section(self->debugdata, debugdata_sz, shdr_strtab);
-            if(NULL == strtab) continue;
+            char *strtab = (char *)xdl_read_memory_to_heap_by_section(debugdata, debugdata_sz, shdr_strtab);
+            if(NULL == strtab)
+            {
+                free(symtab);
+                continue;
+            }
 
             // OK
             self->symtab = symtab;
@@ -265,11 +287,8 @@ static int xdl_symtab_load_from_debugdata(xdl_t *self, int file_fd, size_t file_
 
  end:
     free(debugdata_zip);
-    if(0 != r && NULL != self->debugdata)
-    {
-        free(self->debugdata);
-        self->debugdata = NULL;
-    }
+    if(NULL != debugdata) free(debugdata);
+    if(NULL != shdrs) free(shdrs);
     return r;
 }
 
@@ -549,17 +568,8 @@ void *xdl_close(void *handle)
 
     xdl_t *self = (xdl_t *)handle;
     if(NULL != self->pathname) free(self->pathname);
-    if(NULL != self->debugdata)
-    {
-        // free unzipped .gnu_debugdata
-        // self->symtab and self->strtab points to self->debugdata
-        free(self->debugdata);
-    }
-    else
-    {
-        if(NULL != self->symtab) free(self->symtab);
-        if(NULL != self->strtab) free(self->strtab);
-    }
+    if(NULL != self->symtab) free(self->symtab);
+    if(NULL != self->strtab) free(self->strtab);
 
     void *linker_handle = self->linker_handle;
     free(self);

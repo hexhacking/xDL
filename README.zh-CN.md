@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.1.1-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.1.2-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2012-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -33,10 +33,10 @@ xDL 是 Android DL 系列函数的增强实现。
 
 | ABI         | 压缩后 (KB) | 未压缩 (KB) |
 | :---------- | ---------: | ---------: |
-| armeabi-v7a | 6.8        | 12.0       |
-| arm64-v8a   | 7.6        | 16.2       |
-| x86         | 7.8        | 15.1       |
-| x86_64      | 7.8        | 16.6       |
+| armeabi-v7a | 7.0        | 13         |
+| arm64-v8a   | 7.7        | 17         |
+| x86         | 7.9        | 16         |
+| x86_64      | 7.9        | 17         |
 
 
 ## 使用
@@ -61,7 +61,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.hexhacking:xdl:1.1.1'
+    implementation 'io.hexhacking:xdl:1.1.2'
 }
 ```
 
