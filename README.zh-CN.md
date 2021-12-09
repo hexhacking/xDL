@@ -266,8 +266,6 @@ int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), voi
 
 xDL 使用 [MIT 许可证](LICENSE)。
 
-xDL 的文档使用 [Creative Commons 许可证](LICENSE-docs)。
-
 
 ## 历史
 

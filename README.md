@@ -266,8 +266,6 @@ These flags are needed because these capabilities require additional execution t
 
 xDL is MIT licensed, as found in the [LICENSE](LICENSE) file.
 
-xDL documentation is Creative Commons licensed, as found in the [LICENSE-docs](LICENSE-docs) file.
-
 
 ## History
 
