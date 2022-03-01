@@ -38,8 +38,7 @@ Please make sure the following is done when submitting a pull request:
 
 ## Code Style Guide
 
-1. 4 spaces for indentation rather than tabs.
-2. Follow the C code style already in place.
+Follow the [.clang-format](.clang-format) for C code.
 
 
 ## License
