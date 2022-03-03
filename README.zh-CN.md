@@ -261,6 +261,7 @@ int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), voi
 
 * [Code of Conduct](CODE_OF_CONDUCT.md)
 * [Contributing Guide](CONTRIBUTING.md)
+* [Reporting Security vulnerabilities](SECURITY.md)
 
 
 ## 许可证

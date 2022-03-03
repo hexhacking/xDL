@@ -261,6 +261,7 @@ These flags are needed because these capabilities require additional execution t
 
 * [Code of Conduct](CODE_OF_CONDUCT.md)
 * [Contributing Guide](CONTRIBUTING.md)
+* [Reporting Security vulnerabilities](SECURITY.md)
 
 
 ## License
