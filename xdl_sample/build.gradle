@@ -66,7 +66,7 @@ dependencies {
     if (rootProject.ext.dependencyOnLocalLibrary) {
         implementation project(':xdl')
     } else {
-        implementation 'io.hexhacking:xdl:1.1.2'
+        implementation 'io.hexhacking:xdl:1.1.3'
     }
 }
 
