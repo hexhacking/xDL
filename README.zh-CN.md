@@ -242,19 +242,11 @@ int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), voi
 需要这些 flags 的原因是，这些额外的能力也需要花费额外的执行时间，而你并不总是需要这些能力。
 
 
-## 官方仓库
-
-* https://github.com/hexhacking/xDL
-* https://gitlab.com/hexhacking/xDL
-* https://gitee.com/hexhacking/xDL
-
-
 ## 技术支持
 
-* 查看 [xdl-sample](xdl_sample)。
-* 在 [GitHub issues](https://github.com/hexhacking/xDL/issues) 交流。
-* 邮件：<a href="mailto:caikelun@gmail.com">caikelun@gmail.com</a>
-* QQ 群：603635869
+* [GitHub Issues](https://github.com/hexhacking/xDL/issues)
+* [GitHub Discussions](https://github.com/hexhacking/xDL/discussions)
+* [Telegram Public Group](https://t.me/android_native_geeks)
 
 
 ## 贡献

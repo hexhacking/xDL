@@ -242,19 +242,11 @@ int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), voi
 These flags are needed because these capabilities require additional execution time, and you don't always need them.
 
 
-## Official Repositories
-
-* https://github.com/hexhacking/xDL
-* https://gitlab.com/hexhacking/xDL
-* https://gitee.com/hexhacking/xDL
-
-
 ## Support
 
-* Check the [xdl-sample](xdl_sample).
-* Communicate on [GitHub issues](https://github.com/hexhacking/xDL/issues).
-* Email: <a href="mailto:caikelun@gmail.com">caikelun@gmail.com</a>
-* QQ group: 603635869
+* [GitHub Issues](https://github.com/hexhacking/xDL/issues)
+* [GitHub Discussions](https://github.com/hexhacking/xDL/discussions)
+* [Telegram Public Group](https://t.me/android_native_geeks)
 
 
 ## Contributing
