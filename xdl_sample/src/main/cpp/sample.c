@@ -38,6 +38,7 @@
 #define BASENAME_VDSO        "[vdso]"
 #define BASENAME_LIBNETUTILS "libnetutils.so"
 #define BASENAME_LIBCAP      "libcap.so"
+#define BASENAME_LIBOPENCL   "libOpenCL.so"
 
 #define PATHNAME_LIBC_FIXED \
   (android_get_device_api_level() < __ANDROID_API_Q__ ? PATHNAME_LIBC : PATHNAME_LIBC_Q)
@@ -135,6 +136,10 @@ static void sample_test(JNIEnv *env, jobject thiz) {
   // libcap.so (may need to be loaded from disk into memory)
   void *linker_handle_libcap = sample_test_dlsym(BASENAME_LIBCAP, "cap_dup", false, &cache, true);
 
+  // libOpenCL.so (may need to be loaded from disk into memory)
+  void *linker_handle_libOpenCL =
+      sample_test_dlsym(BASENAME_LIBOPENCL, "clCreateContext", false, &cache, true);
+
   // clean cache for xdl_addr()
   xdl_addr_clean(&cache);
 
@@ -147,6 +152,10 @@ static void sample_test(JNIEnv *env, jobject thiz) {
   if (NULL != linker_handle_libcap) {
     LOG("--- dlclose(%s) : linker_handle %" PRIxPTR, BASENAME_LIBCAP, (uintptr_t)linker_handle_libcap);
     dlclose(linker_handle_libcap);
+  }
+  if (NULL != linker_handle_libOpenCL) {
+    LOG("--- dlclose(%s) : linker_handle %" PRIxPTR, BASENAME_LIBOPENCL, (uintptr_t)linker_handle_libOpenCL);
+    dlclose(linker_handle_libOpenCL);
   }
 }
 
