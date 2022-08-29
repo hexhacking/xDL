@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.18.1)
+cmake_minimum_required(VERSION 3.22.1)
 project(xdl)
 
 file(GLOB XDL_SRC *.c)
 add_library(xdl SHARED ${XDL_SRC})
-target_compile_features(xdl PUBLIC c_std_11)
-target_compile_options(xdl PUBLIC -Weverything -Werror)
+target_compile_features(xdl PUBLIC c_std_17)
+target_compile_options(xdl PUBLIC -std=c17 -Weverything -Werror)
 target_include_directories(xdl PUBLIC include .)
 #target_link_libraries(xdl log)
 
