@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.1.5-red.svg?style=flat)
+![](https://img.shields.io/badge/release-1.2.0-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2013-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -61,7 +61,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.hexhacking:xdl:1.1.5'
+    implementation 'io.hexhacking:xdl:1.2.0'
 }
 ```
 
@@ -202,21 +202,21 @@ typedef struct
     size_t            dli_ssize;
     const ElfW(Phdr) *dlpi_phdr;
     size_t            dlpi_phnum;
-} xdl_info;
+} xdl_info_t;
 
-int xdl_addr(void *addr, xdl_info *info, void **cache);
+int xdl_addr(void *addr, xdl_info_t *info, void **cache);
 void xdl_addr_clean(void **cache);
 ```
 
 `xdl_addr()` is similar to [`dladdr()`](https://man7.org/linux/man-pages/man3/dladdr.3.html). But there are a few differences:
 
 * `xdl_addr()` can lookup not only dynamic link symbols, but also debugging symbols. 
-* `xdl_addr()` uses the `xdl_info` structure instead of the `Dl_info` structure, which contains more extended information: `dli_ssize` is the number of bytes occupied by the current symbol; `dlpi_phdr` points to the program headers array of the ELF where the current symbol is located; `dlpi_phnum` is the number of elements in the `dlpi_phdr` array.
+* `xdl_addr()` uses the `xdl_info_t` structure instead of the `Dl_info` structure, which contains more extended information: `dli_ssize` is the number of bytes occupied by the current symbol; `dlpi_phdr` points to the program headers array of the ELF where the current symbol is located; `dlpi_phnum` is the number of elements in the `dlpi_phdr` array.
 * `xdl_addr()` needs to pass an additional parameter (`cache`), which will cache the ELF handle opened during the execution of `xdl_addr()`. The purpose of caching is to make subsequent executions of `xdl_addr()` of the same ELF faster. When you do not need to execute `xdl_addr()`, please use `xdl_addr_clean()` to clear the cache. For example:
 
 ```C
 void *cache = NULL;
-xdl_info info;
+xdl_info_t info;
 xdl_addr(addr_1, &info, &cache);
 xdl_addr(addr_2, &info, &cache);
 xdl_addr(addr_3, &info, &cache);
@@ -241,6 +241,19 @@ int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), voi
 
 These flags are needed because these capabilities require additional execution time, and you don't always need them.
 
+### 5. `xdl_info()`
+
+```C
+#define XDL_DI_DLINFO 1  // type of info: xdl_info_t
+
+int xdl_info(void *handle, int request, void *info);
+```
+
+`xdl_info()` is similar to [`dlinfo()`](https://man7.org/linux/man-pages/man3/dl_iterate_phdr.3.html). `xdl_info()` obtains information about the dynamically loaded object referred to by `handle` (obtained by an earlier call to `xdl_open`).
+
+The only `request` parameter currently supported is `XDL_DI_DLINFO`, which means to return data of type `xdl_info_t` through the `info` parameter (note that the values of `dli_sname`, `dli_saddr`, `dli_ssize` in the returned `xdl_info_t` at this time both are `0`).
+
+On success, `xdl_info()` returns `0`.  On failure, it returns `-1`.
 
 ## Support
 

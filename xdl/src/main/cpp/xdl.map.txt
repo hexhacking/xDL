@@ -7,6 +7,7 @@
         xdl_addr;
         xdl_addr_clean;
         xdl_iterate_phdr;
+        xdl_info;
 
     local:
         *;
