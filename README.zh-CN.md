@@ -249,7 +249,7 @@ int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), voi
 int xdl_info(void *handle, int request, void *info);
 ```
 
-`xdl_info()` 和 [`dlinfo()`](https://man7.org/linux/man-pages/man3/dl_iterate_phdr.3.html) 类似。`xdl_info()` 通过 `handle`（`xdl_open` 的返回值）来获取动态加载对象的信息。
+`xdl_info()` 和 [`dlinfo()`](https://man7.org/linux/man-pages/man3/dlinfo.3.html) 类似。`xdl_info()` 通过 `handle`（`xdl_open` 的返回值）来获取动态加载对象的信息。
 
 目前唯一支持的 `request` 参数是 `XDL_DI_DLINFO`，表示通过 `info` 参数返回 `xdl_info_t` 类型的数据（注意，此时返回的 `xdl_info_t` 中 `dli_sname`、`dli_saddr`、`dli_ssize` 的值均为 `0`）。
 

@@ -249,7 +249,7 @@ These flags are needed because these capabilities require additional execution t
 int xdl_info(void *handle, int request, void *info);
 ```
 
-`xdl_info()` is similar to [`dlinfo()`](https://man7.org/linux/man-pages/man3/dl_iterate_phdr.3.html). `xdl_info()` obtains information about the dynamically loaded object referred to by `handle` (obtained by an earlier call to `xdl_open`).
+`xdl_info()` is similar to [`dlinfo()`](https://man7.org/linux/man-pages/man3/dlinfo.3.html). `xdl_info()` obtains information about the dynamically loaded object referred to by `handle` (obtained by an earlier call to `xdl_open`).
 
 The only `request` parameter currently supported is `XDL_DI_DLINFO`, which means to return data of type `xdl_info_t` through the `info` parameter (note that the values of `dli_sname`, `dli_saddr`, `dli_ssize` in the returned `xdl_info_t` at this time both are `0`).
 
