@@ -11,7 +11,7 @@ ext {
     minSdkVersion = 16
     compileSdkVersion = 33
     targetSdkVersion = 33
-    buildToolsVersion = "33.0.0"
+    buildToolsVersion = "33.0.1"
     javaVersion = JavaVersion.VERSION_1_7
     ndkVersion = "23.2.8568313"
     cmakeVersion = "3.22.1"
