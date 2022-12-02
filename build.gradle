@@ -21,7 +21,7 @@ ext {
 
     POM_GROUP_ID = "io.hexhacking"
     POM_ARTIFACT_ID = "xdl"
-    POM_VERSION_NAME = "1.2.0"
+    POM_VERSION_NAME = "1.2.1"
 
     POM_NAME = "xDL Android Lib"
     POM_DESCRIPTION = "xDL is an enhanced implementation of the Android DL series functions."
