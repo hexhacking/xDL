@@ -7,7 +7,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     ndkVersion rootProject.ext.ndkVersion
     defaultConfig {
-        applicationId "io.hexhacking.xdl.sample"
+        applicationId "io.github.hexhacking.xdl.sample"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -66,7 +66,7 @@ dependencies {
     if (rootProject.ext.dependencyOnLocalLibrary) {
         implementation project(':xdl')
     } else {
-        implementation 'io.hexhacking:xdl:1.2.1'
+        implementation 'io.github.hexhacking:xdl:1.2.1'
     }
 }
 

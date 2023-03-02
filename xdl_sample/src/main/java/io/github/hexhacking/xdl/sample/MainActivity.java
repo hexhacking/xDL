@@ -1,4 +1,4 @@
-package io.hexhacking.xdl.sample;
+package io.github.hexhacking.xdl.sample;
 
 import androidx.appcompat.app.AppCompatActivity;
 

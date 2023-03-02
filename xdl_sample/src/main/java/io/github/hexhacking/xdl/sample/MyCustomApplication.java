@@ -1,4 +1,4 @@
-package io.hexhacking.xdl.sample;
+package io.github.hexhacking.xdl.sample;
 
 import android.app.Application;
 import android.content.Context;

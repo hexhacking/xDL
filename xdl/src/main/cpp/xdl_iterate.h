@@ -21,8 +21,8 @@
 
 // Created by caikelun on 2020-10-04.
 
-#ifndef IO_HEXHACKING_XDL_ITERATE
-#define IO_HEXHACKING_XDL_ITERATE
+#ifndef IO_GITHUB_HEXHACKING_XDL_ITERATE
+#define IO_GITHUB_HEXHACKING_XDL_ITERATE
 
 #include <link.h>
 #include <stddef.h>

@@ -13,7 +13,7 @@
 #include "xdl.h"
 
 #define SAMPLE_JNI_VERSION    JNI_VERSION_1_6
-#define SAMPLE_JNI_CLASS_NAME "io/hexhacking/xdl/sample/NativeSample"
+#define SAMPLE_JNI_CLASS_NAME "io/github/hexhacking/xdl/sample/NativeSample"
 
 // log
 #pragma clang diagnostic push

@@ -29,8 +29,8 @@
 // https://github.com/hexhacking/xDL
 //
 
-#ifndef IO_HEXHACKING_XDL
-#define IO_HEXHACKING_XDL
+#ifndef IO_GITHUB_HEXHACKING_XDL
+#define IO_GITHUB_HEXHACKING_XDL
 
 #include <dlfcn.h>
 #include <link.h>

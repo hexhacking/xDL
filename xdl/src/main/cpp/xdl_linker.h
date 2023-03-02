@@ -21,8 +21,8 @@
 
 // Created by caikelun on 2021-02-21.
 
-#ifndef IO_HEXHACKING_XDL_LINKER
-#define IO_HEXHACKING_XDL_LINKER
+#ifndef IO_GITHUB_HEXHACKING_XDL_LINKER
+#define IO_GITHUB_HEXHACKING_XDL_LINKER
 
 #ifdef __cplusplus
 extern "C" {

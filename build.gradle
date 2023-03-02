@@ -19,7 +19,7 @@ ext {
     useASAN = false
     dependencyOnLocalLibrary = true
 
-    POM_GROUP_ID = "io.hexhacking"
+    POM_GROUP_ID = "io.github.hexhacking"
     POM_ARTIFACT_ID = "xdl"
     POM_VERSION_NAME = "1.2.1"
 

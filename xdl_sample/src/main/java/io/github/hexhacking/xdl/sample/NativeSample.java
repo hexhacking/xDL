@@ -1,4 +1,4 @@
-package io.hexhacking.xdl.sample;
+package io.github.hexhacking.xdl.sample;
 
 public class NativeSample {
     public static void test() {

@@ -21,8 +21,8 @@
 
 // Created by caikelun on 2020-11-08.
 
-#ifndef IO_HEXHACKING_XDL_LZMA
-#define IO_HEXHACKING_XDL_LZMA
+#ifndef IO_GITHUB_HEXHACKING_XDL_LZMA
+#define IO_GITHUB_HEXHACKING_XDL_LZMA
 
 #include <stddef.h>
 #include <stdint.h>

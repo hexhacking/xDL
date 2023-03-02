@@ -61,7 +61,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.hexhacking:xdl:1.2.1'
+    implementation 'io.github.hexhacking:xdl:1.2.1'
 }
 ```
 
