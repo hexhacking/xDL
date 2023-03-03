@@ -818,6 +818,7 @@ int xdl_addr(void *addr, xdl_info_t *info, void **cache) {
   info->dli_ssize = 0;
   info->dlpi_phdr = handle->dlpi_phdr;
   info->dlpi_phnum = (size_t)handle->dlpi_phnum;
+  info->dli_lbase = handle->base;
 
   // keep looking for: symbol name, symbol offset, symbol size
   ElfW(Sym) *sym;
@@ -865,5 +866,6 @@ int xdl_info(void *handle, int request, void *info) {
   dlinfo->dli_ssize = 0;
   dlinfo->dlpi_phdr = self->dlpi_phdr;
   dlinfo->dlpi_phnum = (size_t)self->dlpi_phnum;
+  dlinfo->dli_lbase = self->base;
   return 0;
 }

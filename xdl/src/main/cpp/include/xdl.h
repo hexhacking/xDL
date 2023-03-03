@@ -50,6 +50,7 @@ typedef struct {
   size_t dli_ssize;             // Symbol size of nearest symbol with address lower than addr.
   const ElfW(Phdr) *dlpi_phdr;  // Pointer to array of ELF program headers for this object.
   size_t dlpi_phnum;            // Number of items in dlpi_phdr.
+  void *dli_lbase;
 } xdl_info_t;
 
 //
