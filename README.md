@@ -72,7 +72,7 @@ dependencies {
 | version range  | group ID                 | artifact ID | Repository URL |
 |:---------------|:-------------------------|:------------| :--------------|
 | [1.0.3, 1.2.1] | io.hexhacking            | xdl         | [repo](https://repo1.maven.org/maven2/io/hexhacking/xdl/) |
-| [2.0.0, )      | **io.github.hexhacking** | xdl         | [repo](https://repo.maven.apache.org/maven2/io/github/hexhacking/xdl/) |
+| [2.0.0, )      | **io.github.hexhacking** | xdl         | [repo](https://repo1.maven.org/maven2/io/github/hexhacking/xdl/) |
 
 2. xDL uses the [prefab package schema v2](https://github.com/google/prefab/releases/tag/v2.0.0), which is configured by default since [Android Gradle Plugin 7.1.0](https://developer.android.com/studio/releases/gradle-plugin?buildsystem=cmake#7-1-0). If you are using Android Gradle Plugin earlier than 7.1.0, please add the following configuration to `gradle.properties`:
 
