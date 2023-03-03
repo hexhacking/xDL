@@ -46,14 +46,6 @@ If xDL is compiled into an independent dynamic library:
 xDL is published on [Maven Central](https://search.maven.org/), and uses [Prefab](https://google.github.io/prefab/) package format for [native dependencies](https://developer.android.com/studio/build/native-dependencies), which is supported by [Android Gradle Plugin 4.0+](https://developer.android.com/studio/releases/gradle-plugin?buildsystem=cmake#native-dependencies).
 
 ```Gradle
-allprojects {
-    repositories {
-        mavenCentral()
-    }
-}
-```
-
-```Gradle
 android {
     buildFeatures {
         prefab true

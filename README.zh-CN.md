@@ -46,14 +46,6 @@ xDL 是 Android DL 系列函数的增强实现。
 xDL 发布在 [Maven Central](https://search.maven.org/) 上。为了使用 [native 依赖项](https://developer.android.com/studio/build/native-dependencies)，xDL 使用了从 [Android Gradle Plugin 4.0+](https://developer.android.com/studio/releases/gradle-plugin?buildsystem=cmake#native-dependencies) 开始支持的 [Prefab](https://google.github.io/prefab/) 包格式。
 
 ```Gradle
-allprojects {
-    repositories {
-        mavenCentral()
-    }
-}
-```
-
-```Gradle
 android {
     buildFeatures {
         prefab true
