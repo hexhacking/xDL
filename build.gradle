@@ -1,6 +1,6 @@
 plugins {
-    id 'com.android.application' version '7.2.2' apply false
-    id 'com.android.library' version '7.2.2' apply false
+    id 'com.android.application' version '7.4.2' apply false
+    id 'com.android.library' version '7.4.2' apply false
 }
 
 task clean(type: Delete) {
@@ -11,17 +11,18 @@ ext {
     minSdkVersion = 16
     compileSdkVersion = 33
     targetSdkVersion = 33
-    buildToolsVersion = "33.0.1"
-    javaVersion = JavaVersion.VERSION_1_7
+    buildToolsVersion = "33.0.2"
+    javaVersion = JavaVersion.VERSION_1_8
     ndkVersion = "23.2.8568313"
     cmakeVersion = "3.22.1"
     abiFilters = "armeabi-v7a,arm64-v8a,x86,x86_64"
     useASAN = false
     dependencyOnLocalLibrary = true
+    xdlVersion = "2.0.0"
 
     POM_GROUP_ID = "io.github.hexhacking"
     POM_ARTIFACT_ID = "xdl"
-    POM_VERSION_NAME = "1.2.1"
+    POM_VERSION_NAME = "2.0.0"
 
     POM_NAME = "xDL Android Lib"
     POM_DESCRIPTION = "xDL is an enhanced implementation of the Android DL series functions."

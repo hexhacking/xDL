@@ -3,6 +3,7 @@ plugins {
 }
 
 android {
+    namespace 'io.github.hexhacking.xdl.sample'
     compileSdkVersion rootProject.ext.compileSdkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     ndkVersion rootProject.ext.ndkVersion
@@ -18,9 +19,6 @@ android {
         externalNativeBuild {
             cmake {
                 abiFilters rootProject.ext.abiFilters.split(",")
-                if (rootProject.ext.dependencyOnLocalLibrary) {
-                    arguments "-DDEPENDENCY_ON_LOCAL_LIBRARY=ON"
-                }
             }
         }
     }
@@ -34,8 +32,8 @@ android {
 //        }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility rootProject.ext.javaVersion
+        targetCompatibility rootProject.ext.javaVersion
     }
     buildTypes {
         debug {
@@ -59,14 +57,14 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.5.1'
-    implementation 'com.google.android.material:material:1.7.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.8.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 
     if (rootProject.ext.dependencyOnLocalLibrary) {
         implementation project(':xdl')
     } else {
-        implementation 'io.github.hexhacking:xdl:1.2.1'
+        implementation 'io.github.hexhacking:xdl:' + rootProject.ext.xdlVersion
     }
 }
 

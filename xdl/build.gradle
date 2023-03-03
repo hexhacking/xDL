@@ -3,6 +3,7 @@ plugins {
 }
 
 android {
+    namespace 'io.github.hexhacking.xdl'
     compileSdkVersion rootProject.ext.compileSdkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     ndkVersion rootProject.ext.ndkVersion
@@ -40,10 +41,17 @@ android {
     }
     buildFeatures {
         prefabPublishing true
+        buildConfig false
     }
     prefab {
         xdl {
             headers "src/main/cpp/include"
+        }
+    }
+    publishing {
+        singleVariant('release') {
+            withSourcesJar()
+            withJavadocJar()
         }
     }
 }

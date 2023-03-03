@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-1.2.1-red.svg?style=flat)
+![](https://img.shields.io/badge/release-2.0.0-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2013-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -61,8 +61,23 @@ android {
 }
 
 dependencies {
-    implementation 'io.github.hexhacking:xdl:1.2.1'
+    implementation 'io.github.hexhacking:xdl:2.0.0'
 }
+```
+
+**注意**：
+
+1. xDL 从版本 `2.0.0` 开始，group ID 从 `io.hexhacking` 改为 `io.github.hexhacking`。
+
+| 版本号范围          | group ID                 | artifact ID | 仓库 URL                                                                 |
+|:---------------|:-------------------------|:------------|:-----------------------------------------------------------------------|
+| [1.0.3, 1.2.1] | io.hexhacking            | xdl         | [repo](https://repo1.maven.org/maven2/io/hexhacking/xdl/)              |
+| [2.0.0, )      | **io.github.hexhacking** | xdl         | [repo](https://repo.maven.apache.org/maven2/io/github/hexhacking/xdl/) |
+
+2. xDL 使用 [prefab package schema v2](https://github.com/google/prefab/releases/tag/v2.0.0)，它是从 [Android Gradle Plugin 7.1.0](https://developer.android.com/studio/releases/gradle-plugin?buildsystem=cmake#7-1-0) 开始作为默认配置的。如果你使用的是 Android Gradle Plugin 7.1.0 之前的版本，请在 `gradle.properties` 中加入以下配置：
+
+```
+android.prefabVersion=2.0.0
 ```
 
 ### 2. 在 CMakeLists.txt 或 Android.mk 中增加依赖
