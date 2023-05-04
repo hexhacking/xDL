@@ -68,7 +68,7 @@ typedef struct xdl {
   ElfW(Half) dlpi_phnum;
 
   struct xdl *next;     // to next xdl obj for cache in xdl_addr()
-  void *linker_handle;  // hold handle returned by xdl_linker_load()
+  void *linker_handle;  // hold handle returned by xdl_linker_force_dlopen()
 
   //
   // (1) for searching symbols from .dynsym
@@ -383,7 +383,7 @@ end:
 }
 
 static xdl_t *xdl_find_from_auxv(unsigned long type, const char *pathname) {
-  if (NULL == getauxval) return NULL;
+  if (NULL == getauxval) return NULL;  // API level < 18
 
   uintptr_t val = (uintptr_t)getauxval(type);
   if (0 == val) return NULL;
@@ -497,7 +497,7 @@ static xdl_t *xdl_find(const char *filename) {
 
 static void *xdl_open_always_force(const char *filename) {
   // always force dlopen()
-  void *linker_handle = xdl_linker_load(filename);
+  void *linker_handle = xdl_linker_force_dlopen(filename);
   if (NULL == linker_handle) return NULL;
 
   // find
@@ -516,7 +516,7 @@ static void *xdl_open_try_force(const char *filename) {
   if (NULL != self) return (void *)self;
 
   // try force dlopen()
-  void *linker_handle = xdl_linker_load(filename);
+  void *linker_handle = xdl_linker_force_dlopen(filename);
   if (NULL == linker_handle) return NULL;
 
   // find again
