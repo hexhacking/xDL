@@ -39,6 +39,7 @@
 #define BASENAME_LIBNETUTILS "libnetutils.so"
 #define BASENAME_LIBCAP      "libcap.so"
 #define BASENAME_LIBOPENCL   "libOpenCL.so"
+#define BASENAME_LIBART      "libart.so"
 
 #define PATHNAME_LIBC_FIXED \
   (android_get_device_api_level() < __ANDROID_API_Q__ ? PATHNAME_LIBC : PATHNAME_LIBC_Q)
@@ -137,6 +138,10 @@ static void sample_test(JNIEnv *env, jobject thiz) {
   // libc++.so
   sample_test_dlsym(PATHNAME_LIBCPP, "_ZNSt3__14cerrE", false, &cache, false);
   sample_test_dlsym(PATHNAME_LIBCPP, "abort_message", true, &cache, false);
+
+  // libart.so
+  sample_test_dlsym(BASENAME_LIBART, "_ZN3artL16FindOatMethodForEPNS_9ArtMethodENS_11PointerSizeEPb", true,
+                    &cache, false);
 
   // libnetutils.so (may need to be loaded from disk into memory)
   void *linker_handle_libnetutils =
