@@ -452,7 +452,7 @@ static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg
 
   // found the target ELF
   if (NULL == ((*self) = calloc(1, sizeof(xdl_t)))) return 1;  // return failed
-  if (NULL == ((*self)->pathname = strdup(info->dlpi_name))) {
+  if (NULL == ((*self)->pathname = strdup((const char *)info->dlpi_name))) {
     free(*self);
     *self = NULL;
     return 1;  // return failed
@@ -741,10 +741,12 @@ static int xdl_open_by_addr_iterate_cb(struct dl_phdr_info *info, size_t size, v
   xdl_t **self = (xdl_t **)*pkg++;
   uintptr_t addr = *pkg;
 
+  if (0 == info->dlpi_addr || NULL == info->dlpi_name) return 0; // continue
+
   if (xdl_elf_is_match(info->dlpi_addr, info->dlpi_phdr, info->dlpi_phnum, addr)) {
     // found the target ELF
     if (NULL == ((*self) = calloc(1, sizeof(xdl_t)))) return 1;  // failed
-    if (NULL == ((*self)->pathname = strdup(info->dlpi_name))) {
+    if (NULL == ((*self)->pathname = strdup((const char *)info->dlpi_name))) {
       free(*self);
       *self = NULL;
       return 1;  // failed
@@ -757,7 +759,7 @@ static int xdl_open_by_addr_iterate_cb(struct dl_phdr_info *info, size_t size, v
     return 1;  // OK
   }
 
-  return 0;  // mismatch
+  return 0;  // continue
 }
 
 static void *xdl_open_by_addr(void *addr) {
