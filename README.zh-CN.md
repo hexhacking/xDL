@@ -2,7 +2,7 @@
 
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
-![](https://img.shields.io/badge/release-2.1.0-red.svg?style=flat)
+![](https://img.shields.io/badge/release-2.1.1-red.svg?style=flat)
 ![](https://img.shields.io/badge/Android-4.1%20--%2014-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
@@ -53,7 +53,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.github.hexhacking:xdl:2.1.0'
+    implementation 'io.github.hexhacking:xdl:2.1.1'
 }
 ```
 
