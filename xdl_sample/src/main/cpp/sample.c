@@ -80,12 +80,14 @@ static void *sample_test_dlsym(const char *filename, const char *symbol, bool de
   void *handle = xdl_open(filename, try_force_dlopen ? XDL_TRY_FORCE_LOAD : XDL_DEFAULT);
   LOG(">>> xdl_open(%s) : handle %" PRIxPTR, filename, (uintptr_t)handle);
 
-  // xdl_info
+  // xdl_info(XDL_DI_DLINFO)
   memset(&info, 0, sizeof(xdl_info_t));
-  xdl_info(handle, XDL_DI_DLINFO, &info);
-  LOG(">>> xdl_info(%" PRIxPTR ") : %" PRIxPTR " %s (phdr %" PRIxPTR ", phnum %zu)", (uintptr_t)handle,
-      (uintptr_t)info.dli_fbase, (NULL == info.dli_fname ? "(NULL)" : info.dli_fname),
-      (uintptr_t)info.dlpi_phdr, info.dlpi_phnum);
+  if (0 > xdl_info(handle, XDL_DI_DLINFO, &info))
+    LOG(">>> xdl_info(XDL_DI_DLINFO, %" PRIxPTR ") : FAILED", (uintptr_t)handle);
+  else
+    LOG(">>> xdl_info(XDL_DI_DLINFO, %" PRIxPTR ") : %" PRIxPTR " %s (phdr %" PRIxPTR ", phnum %zu)", (uintptr_t)handle,
+        (uintptr_t)info.dli_fbase, (NULL == info.dli_fname ? "(NULL)" : info.dli_fname),
+        (uintptr_t)info.dlpi_phdr, info.dlpi_phnum);
 
   // xdl_dsym / xdl_sym
   size_t symbol_size = 0;
@@ -106,6 +108,15 @@ static void *sample_test_dlsym(const char *filename, const char *symbol, bool de
         (uintptr_t)symbol_addr, (uintptr_t)info.dli_fbase,
         (NULL == info.dli_fname ? "(NULL)" : info.dli_fname), (uintptr_t)info.dlpi_phdr, info.dlpi_phnum,
         (uintptr_t)info.dli_saddr, (NULL == info.dli_sname ? "(NULL)" : info.dli_sname), info.dli_ssize);
+
+  // xdl_info(XDL_DI_DLINFO_BY_ADDR)
+  memset(&info, 0, sizeof(xdl_info_t));
+  if (0 > xdl_info(symbol_addr, XDL_DI_DLINFO_BY_ADDR, &info))
+    LOG(">>> xdl_info(XDL_DI_DLINFO_BY_ADDR, %" PRIxPTR ") : FAILED", (uintptr_t)symbol_addr);
+  else
+    LOG(">>> xdl_info(XDL_DI_DLINFO_BY_ADDR, %" PRIxPTR ") : %" PRIxPTR " %s (phdr %" PRIxPTR ", phnum %zu)", (uintptr_t)symbol_addr,
+        (uintptr_t)info.dli_fbase, (NULL == info.dli_fname ? "(NULL)" : info.dli_fname),
+        (uintptr_t)info.dlpi_phdr, info.dlpi_phnum);
 
   LOG(LOG_END);
 
