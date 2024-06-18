@@ -145,6 +145,7 @@ static void sample_test(JNIEnv *env, jobject thiz) {
   // libc.so
   sample_test_dlsym(PATHNAME_LIBC_FIXED, "android_set_abort_message", false, &cache, false);
   sample_test_dlsym(PATHNAME_LIBC_FIXED, "je_mallctl", true, &cache, false);
+  sample_test_dlsym("libc.so", "memmove", false, &cache, false);
 
   // libc++.so
   sample_test_dlsym(PATHNAME_LIBCPP, "_ZNSt3__14cerrE", false, &cache, false);
