@@ -82,8 +82,7 @@ int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), voi
 //
 // Custom dlinfo().
 //
-#define XDL_DI_DLINFO 1          // type of info: xdl_info_t, type of handle: xdl_t
-#define XDL_DI_DLINFO_BY_ADDR 2  // type of info: xdl_info_t, type of handle: function or object address
+#define XDL_DI_DLINFO 1  // type of info: xdl_info_t
 int xdl_info(void *handle, int request, void *info);
 
 #ifdef __cplusplus

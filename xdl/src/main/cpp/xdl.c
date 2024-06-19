@@ -967,18 +967,11 @@ int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), voi
 }
 
 int xdl_info(void *handle, int request, void *info) {
-  if (NULL == handle || NULL == info) return -1;
-  if (XDL_DI_DLINFO != request && XDL_DI_DLINFO_BY_ADDR != request) return -1;
+  if (NULL == handle || XDL_DI_DLINFO != request || NULL == info) return -1;
 
-  xdl_t *self;
-  if (XDL_DI_DLINFO == request) {
-    self = (xdl_t *)handle;
-  } else {
-    self = (xdl_t *)xdl_open_by_addr(handle);
-    if (NULL == self) return -1;
-  }
-
+  xdl_t *self = (xdl_t *)handle;
   xdl_info_t *dlinfo = (xdl_info_t *)info;
+
   dlinfo->dli_fbase = (void *)self->load_bias;
   dlinfo->dli_fname = self->pathname;
   dlinfo->dli_sname = NULL;
