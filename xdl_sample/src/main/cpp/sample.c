@@ -109,6 +109,17 @@ static void *sample_test_dlsym(const char *filename, const char *symbol, bool de
         (NULL == info.dli_fname ? "(NULL)" : info.dli_fname), (uintptr_t)info.dlpi_phdr, info.dlpi_phnum,
         (uintptr_t)info.dli_saddr, (NULL == info.dli_sname ? "(NULL)" : info.dli_sname), info.dli_ssize);
 
+  // xdl_addr4(XDL_NON_SYM)
+  memset(&info, 0, sizeof(xdl_info_t));
+  if (0 == xdl_addr4(symbol_addr, &info, cache, XDL_NON_SYM))
+    LOG(">>> xdl_addr4(XDL_NON_SYM, %" PRIxPTR ") : FAILED", (uintptr_t)symbol_addr);
+  else
+    LOG(">>> xdl_addr4(XDL_NON_SYM, %" PRIxPTR ") : %" PRIxPTR " %s (phdr %" PRIxPTR ", phnum %zu), %" PRIxPTR
+        " %s (sz %zu)",
+        (uintptr_t)symbol_addr, (uintptr_t)info.dli_fbase,
+        (NULL == info.dli_fname ? "(NULL)" : info.dli_fname), (uintptr_t)info.dlpi_phdr, info.dlpi_phnum,
+        (uintptr_t)info.dli_saddr, (NULL == info.dli_sname ? "(NULL)" : info.dli_sname), info.dli_ssize);
+
   LOG(LOG_END);
 
   return linker_handle;

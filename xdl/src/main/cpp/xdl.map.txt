@@ -5,6 +5,7 @@
         xdl_sym;
         xdl_dsym;
         xdl_addr;
+        xdl_addr4;
         xdl_addr_clean;
         xdl_iterate_phdr;
         xdl_info;

@@ -211,7 +211,11 @@ typedef struct
     size_t            dlpi_phnum;
 } xdl_info_t;
 
+#define XDL_DEFAULT 0x00
+#define XDL_NON_SYM 0x01
+
 int xdl_addr(void *addr, xdl_info_t *info, void **cache);
+int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags);
 void xdl_addr_clean(void **cache);
 ```
 
@@ -229,6 +233,8 @@ xdl_addr(addr_2, &info, &cache);
 xdl_addr(addr_3, &info, &cache);
 xdl_addr_clean(&cache);
 ```
+
+* `xdl_addr4()` is similar to `xdl_addr()`, except that it adds the `flags` parameter. When the `flags` value is `XDL_DEFAULT`, the behavior of `xdl_addr4()` is the same as `xdl_addr()`. When the `flags` value is `XDL_NON_SYM`, `xdl_addr4()` will not obtain symbol-related information (the values of `dli_sname`, `dli_saddr`, and `dli_ssize` in `xdl_info_t` are all `0`).
 
 ### 4. `xdl_iterate_phdr()`
 

@@ -211,14 +211,18 @@ typedef struct
     size_t            dlpi_phnum;
 } xdl_info_t;
 
+#define XDL_DEFAULT 0x00
+#define XDL_NON_SYM 0x01
+
 int xdl_addr(void *addr, xdl_info_t *info, void **cache);
+int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags);
 void xdl_addr_clean(void **cache);
 ```
 
 `xdl_addr()` 和 [`dladdr()`](https://man7.org/linux/man-pages/man3/dladdr.3.html) 类似。但有以下几点不同：
 
 * `xdl_addr()` 不仅能查询动态链接符号，还能查询调试符号。
-*  `xdl_addr()` 使用 `xdl_info_t` 结构体代替了 `Dl_info` 结构体，它包含了更多的扩展信息：`dli_ssize` 是当前符号所占用的字节数；`dlpi_phdr` 指向当前符号所在 ELF 的 program headers 数组；`dlpi_phnum` 是 `dlpi_phdr` 数组的元素个数。
+* `xdl_addr()` 使用 `xdl_info_t` 结构体代替了 `Dl_info` 结构体，它包含了更多的扩展信息：`dli_ssize` 是当前符号所占用的字节数；`dlpi_phdr` 指向当前符号所在 ELF 的 program headers 数组；`dlpi_phnum` 是 `dlpi_phdr` 数组的元素个数。
 * `xdl_addr()` 需要传递一个附加的参数（cache），其中会缓存 `xdl_addr()` 执行过程中打开的 ELF handle，缓存的目的是使后续对同一个 ELF 的 `xdl_addr()` 执行的更快。当不需要再执行 `xdl_addr()` 时，请使用 `xdl_addr_clean()` 清除缓存。举例：
 
 ```C
@@ -229,6 +233,8 @@ xdl_addr(addr_2, &info, &cache);
 xdl_addr(addr_3, &info, &cache);
 xdl_addr_clean(&cache);
 ```
+
+* `xdl_addr4()` 和 `xdl_addr()` 类似，区别是增加了 `flags` 参数。`flags` 值为 `XDL_DEFAULT` 时，`xdl_addr4()` 的行为与 `xdl_addr()` 相同。`flags` 值为 `XDL_NON_SYM` 时，`xdl_addr4()` 不会去获取符号相关的信息（`xdl_info_t` 中 `dli_sname`、`dli_saddr` 和 `dli_ssize` 的值均为 `0`）。
 
 ### 4. `xdl_iterate_phdr()`
 

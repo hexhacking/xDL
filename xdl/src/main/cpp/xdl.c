@@ -907,6 +907,10 @@ static ElfW(Sym) *xdl_dsym_by_addr(void *handle, void *addr) {
 }
 
 int xdl_addr(void *addr, xdl_info_t *info, void **cache) {
+  return xdl_addr4(addr, info, cache, XDL_DEFAULT);
+}
+
+int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags) {
   if (NULL == addr || NULL == info || NULL == cache) return 0;
 
   memset(info, 0, sizeof(Dl_info));
@@ -934,15 +938,17 @@ int xdl_addr(void *addr, xdl_info_t *info, void **cache) {
   info->dlpi_phnum = (size_t)handle->dlpi_phnum;
 
   // keep looking for: symbol name, symbol offset, symbol size
-  ElfW(Sym) *sym;
-  if (NULL != (sym = xdl_sym_by_addr((void *)handle, addr))) {
-    info->dli_sname = handle->dynstr + sym->st_name;
-    info->dli_saddr = (void *)(handle->load_bias + sym->st_value);
-    info->dli_ssize = sym->st_size;
-  } else if (NULL != (sym = xdl_dsym_by_addr((void *)handle, addr))) {
-    info->dli_sname = handle->strtab + sym->st_name;
-    info->dli_saddr = (void *)(handle->load_bias + sym->st_value);
-    info->dli_ssize = sym->st_size;
+  if (!(flags & XDL_NON_SYM)) {
+    ElfW(Sym) *sym;
+    if (NULL != (sym = xdl_sym_by_addr((void *)handle, addr))) {
+      info->dli_sname = handle->dynstr + sym->st_name;
+      info->dli_saddr = (void *)(handle->load_bias + sym->st_value);
+      info->dli_ssize = sym->st_size;
+    } else if (NULL != (sym = xdl_dsym_by_addr((void *)handle, addr))) {
+      info->dli_sname = handle->strtab + sym->st_name;
+      info->dli_saddr = (void *)(handle->load_bias + sym->st_value);
+      info->dli_ssize = sym->st_size;
+    }
   }
 
   return 1;
