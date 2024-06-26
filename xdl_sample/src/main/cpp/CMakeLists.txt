@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(sample)
 
-find_package(xdl REQUIRED CONFIG)
+if(DEPENDENCY_ON_LOCAL_LIBRARY)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/../../../../xdl/local_dependency.cmake)
+else()
+    find_package(xdl REQUIRED CONFIG)
+endif()
 
 add_library(sample SHARED sample.c)
 target_compile_features(sample PUBLIC c_std_17)
