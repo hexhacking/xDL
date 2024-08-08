@@ -32,11 +32,11 @@ xDL is an enhanced implementation of the Android DL series functions.
 If xDL is compiled into an independent dynamic library:
 
 | ABI         | Compressed (KB) | Uncompressed (KB) |
-| :---------- | --------------: | ----------------: |
-| armeabi-v7a | 7.5             | 13                |
-| arm64-v8a   | 8.5             | 18                |
-| x86         | 8.5             | 17                |
-| x86_64      | 8.7             | 18                |
+| :---------- |----------------:|------------------:|
+| armeabi-v7a |             7.9 |                15 |
+| arm64-v8a   |             9.1 |                20 |
+| x86         |             9.0 |                18 |
+| x86_64      |             9.1 |                20 |
 
 
 ## Usage
