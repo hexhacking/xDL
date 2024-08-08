@@ -3,12 +3,12 @@
 ![](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)
 ![](https://img.shields.io/badge/release-2.2.0-red.svg?style=flat)
-![](https://img.shields.io/badge/Android-4.1%20--%2014-blue.svg?style=flat)
+![](https://img.shields.io/badge/Android-4.1%20--%2015-blue.svg?style=flat)
 ![](https://img.shields.io/badge/arch-armeabi--v7a%20%7C%20arm64--v8a%20%7C%20x86%20%7C%20x86__64-blue.svg?style=flat)
 
 xDL 是 Android DL 系列函数的增强实现。
 
-[README English Version](README.md)
+[**English**](README.md)
 
 
 ## 特征
@@ -22,7 +22,7 @@ xDL 是 Android DL 系列函数的增强实现。
     * 在 Android <= 8.x 时，包含 linker / linker64。
     * 在 Android 5.x 中，返回完整的路径名（full pathname），而不是文件名（basename）。
     * 返回 app\_process32 / app\_process64，而不是包名。
-* 支持 Android 4.1 - 14 (API level 16 - 34)。
+* 支持 Android 4.1 - 15 (API level 16 - 35)。
 * 支持 armeabi-v7a, arm64-v8a, x86 和 x86_64。
 * 使用 MIT 许可证授权。
 
