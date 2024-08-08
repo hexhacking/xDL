@@ -1,47 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:paddingTop="50dp"
     tools:context=".MainActivity">
-
-    <ScrollView
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <Button
-                android:id="@+id/testButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_margin="0dp"
-                android:onClick="onTestClick"
-                android:paddingTop="30dp"
-                android:paddingBottom="30dp"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
-                android:text="test"
-                android:textAllCaps="false"
-                tools:ignore="HardcodedText" />
-
-            <TextView
-                android:id="@+id/textMsg"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_margin="0dp"
-                android:paddingTop="30dp"
-                android:paddingBottom="30dp"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
-                android:gravity="center"
-                android:textSize="50px"
-                android:textColor="#000000"
-                android:text="adb logcat -s xdl_tag" />
-        </LinearLayout>
-    </ScrollView>
+    <Button
+        android:id="@+id/testButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="0dp"
+        android:paddingTop="30dp"
+        android:paddingBottom="30dp"
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp"
+        android:text="test"
+        android:textAllCaps="false"
+        tools:ignore="HardcodedText" />
+    <TextView
+        android:id="@+id/textMsg"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="0dp"
+        android:paddingTop="30dp"
+        android:paddingBottom="30dp"
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp"
+        android:gravity="center"
+        android:textSize="20sp"
+        android:textColor="#000000"
+        android:text="@string/logcat_hints" />
 </LinearLayout>
+

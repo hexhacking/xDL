@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">xDL-sample</string>
+    <string name="logcat_hints">adb logcat -s xdl_tag</string>
 </resources>
