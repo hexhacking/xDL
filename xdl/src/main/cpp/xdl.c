@@ -757,7 +757,7 @@ static inline bool xdl_dsym_is_match(const char *str, const char *sym, size_t sy
     if (str_len == sym_len)
       return sym_len_match;
     else // str_len > sym_len
-      return sym_len_match && (str[sym_len] == '.');
+      return sym_len_match && (str[sym_len] == '.' || str[sym_len] == '$');
   }
 }
 
