@@ -85,8 +85,8 @@ static void *sample_test_dlsym(const char *filename, const char *symbol, bool de
   if (0 > xdl_info(handle, XDL_DI_DLINFO, &info))
     LOG(">>> xdl_info(XDL_DI_DLINFO, %" PRIxPTR ") : FAILED", (uintptr_t)handle);
   else
-    LOG(">>> xdl_info(XDL_DI_DLINFO, %" PRIxPTR ") : %" PRIxPTR " %s (phdr %" PRIxPTR ", phnum %zu)", (uintptr_t)handle,
-        (uintptr_t)info.dli_fbase, (NULL == info.dli_fname ? "(NULL)" : info.dli_fname),
+    LOG(">>> xdl_info(XDL_DI_DLINFO, %" PRIxPTR ") : %" PRIxPTR " %s (phdr %" PRIxPTR ", phnum %zu)",
+        (uintptr_t)handle, (uintptr_t)info.dli_fbase, (NULL == info.dli_fname ? "(NULL)" : info.dli_fname),
         (uintptr_t)info.dlpi_phdr, info.dlpi_phnum);
 
   // xdl_dsym / xdl_sym
