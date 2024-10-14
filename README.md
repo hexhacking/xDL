@@ -146,6 +146,7 @@ There is a sample app in the [xdl-sample](xdl_sample) folder you can refer to.
 #define XDL_ALWAYS_FORCE_LOAD 0x02
 
 void *xdl_open(const char *filename, int flags);
+void *xdl_open2(struct dl_phdr_info *info);
 void *xdl_close(void *handle);
 ```
 
@@ -175,6 +176,8 @@ If `xdl_open()` really uses `dlopen()` to load the library, `xdl_close()` will r
 760baa1000-760baa2000 rw-p 000c2000 fd:03 2441  /system/lib64/libc++.so
 760baa2000-760baaa000 r--p 000c3000 fd:03 2441  /system/lib64/libc++.so
 ```
+
+`xdl_open2()` creates a `handle` from `struct dl_phdr_info`. `xdl_open2()` is always `XDL_DEFAULT` semantics, i.e. it will not try to load ELF with `dlopen()`.
 
 ### 2. `xdl_sym()` and `xdl_dsym()`
 

@@ -1,6 +1,7 @@
 {
     global:
         xdl_open;
+        xdl_open2;
         xdl_close;
         xdl_sym;
         xdl_dsym;

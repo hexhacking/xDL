@@ -547,6 +547,21 @@ void *xdl_open(const char *filename, int flags) {
     return xdl_find(filename);
 }
 
+void *xdl_open2(struct dl_phdr_info *info) {
+  xdl_t *self = calloc(1, sizeof(xdl_t));
+  if (NULL == self) return NULL;
+  if (NULL == (self->pathname = strdup((const char *)info->dlpi_name))) {
+    free(self);
+    return NULL;
+  }
+  self->load_bias = info->dlpi_addr;
+  self->dlpi_phdr = info->dlpi_phdr;
+  self->dlpi_phnum = info->dlpi_phnum;
+  self->dynsym_try_load = false;
+  self->symtab_try_load = false;
+  return self;
+}
+
 void *xdl_close(void *handle) {
   if (NULL == handle) return NULL;
 

@@ -146,6 +146,7 @@ android {
 #define XDL_ALWAYS_FORCE_LOAD 0x02
 
 void *xdl_open(const char *filename, int flags);
+void *xdl_open2(struct dl_phdr_info *info);
 void *xdl_close(void *handle);
 ```
 
@@ -175,6 +176,8 @@ void *xdl_close(void *handle);
 760baa1000-760baa2000 rw-p 000c2000 fd:03 2441  /system/lib64/libc++.so
 760baa2000-760baaa000 r--p 000c3000 fd:03 2441  /system/lib64/libc++.so
 ```
+
+`xdl_open2()` 通过 `struct dl_phdr_info` 创建 `handle`。`xdl_open2()` 始终是 `XDL_DEFAULT` 的语意，即它不会尝试用 `dlopen()` 去加载 ELF。
 
 ### 2. `xdl_sym()` 和 `xdl_dsym()`
 
