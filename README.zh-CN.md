@@ -160,7 +160,7 @@ void *xdl_close(void *handle);
 
 如果 `xdl_open()` 真的使用 `dlopen()` 加载了动态库，`xdl_close()` 将返回从 linker 那里取得的 handle（`dlopen()` 的返回值），然后你可以决定是否以及什么时候使用标准的 `dlclose()` 来关闭它。否则，将返回 `NULL`。
 
-`filename` 可是是文件名（basename）也可以是完整的路径名（full pathname）。然而，Android linker 从 7.0 开始启用了 namespace 机制。如果你传递文件名，你需要确认当前进程中没有重名的 ELF 文件。`xdl_open()` 只会返回第一个匹配到的 ELF文件。请考虑以下 Android 10 中的 `/proc/self/maps` 片段：
+`filename` 可以是文件名（basename）也可以是完整的路径名（full pathname）。然而，Android linker 从 7.0 开始启用了 namespace 机制。如果你传递文件名，你需要确认当前进程中没有重名的 ELF 文件。`xdl_open()` 只会返回第一个匹配到的 ELF文件。请考虑以下 Android 10 中的 `/proc/self/maps` 片段：
 
 ```
 756fc2c000-756fc7c000 r--p 00000000 fd:03 2985  /system/lib64/vndk-sp-29/libc++.so
