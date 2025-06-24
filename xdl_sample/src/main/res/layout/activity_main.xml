@@ -1,36 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:paddingTop="50dp"
-    tools:context=".MainActivity">
-    <Button
-        android:id="@+id/testButton"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/main"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="0dp"
-        android:paddingTop="30dp"
-        android:paddingBottom="30dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
-        android:text="test"
-        android:textAllCaps="false"
-        tools:ignore="HardcodedText" />
-    <TextView
-        android:id="@+id/textMsg"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        tools:context=".MainActivity">
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="0dp"
-        android:paddingTop="30dp"
-        android:paddingBottom="30dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
-        android:gravity="center"
-        android:textSize="20sp"
-        android:textColor="#000000"
-        android:text="@string/logcat_hints" />
-</LinearLayout>
-
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+        <TextView style="@style/Theme.TextView.Top"
+            android:text="adb logcat -s xdl_tag" />
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/white"
+            android:orientation="vertical">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <Button style="@style/Theme.Button"
+                    android:id="@+id/testButton"
+                    android:text="test" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

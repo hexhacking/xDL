@@ -137,6 +137,7 @@ static void sample_test(JNIEnv *env, jobject thiz) {
 
   // linker
   sample_test_dlsym(BASENAME_LINKER, "__dl__ZL10g_dl_mutex", true, &cache, false);
+  sample_test_dlsym(BASENAME_LINKER, "__dl_g_dl_mutex", true, &cache, false);
 
   // app_process
   sample_test_dlsym(BASENAME_APP_PROCESS, "sigaction", false, &cache, false);
