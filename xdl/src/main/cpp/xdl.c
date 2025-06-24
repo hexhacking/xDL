@@ -872,7 +872,7 @@ static bool xdl_sym_is_match(ElfW(Sym) *sym, uintptr_t offset, bool is_symtab) {
   // thumb and is therefore incorrect.
   uintptr_t sym_st_value_fixed = sym->st_value;
 #if defined(__arm__) && defined(__thumb__)
-#define CLEAR_BIT0(addr) ((addr)&0xFFFFFFFE)
+#define CLEAR_BIT0(addr) ((addr) & 0xFFFFFFFE)
   sym_st_value_fixed = CLEAR_BIT0(sym->st_value);
 #endif
 
