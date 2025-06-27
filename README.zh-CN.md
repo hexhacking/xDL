@@ -287,10 +287,3 @@ int xdl_info(void *handle, int request, void *info);
 ## 许可证
 
 xDL 使用 [MIT 许可证](LICENSE)。
-
-
-## 历史
-
-[xCrash 2.x](https://github.com/hexhacking/xCrash/tree/4748d183c1395c54bfb760ec6c454966d52ab73f) 包含一个非常原始的 [xc_dl](https://github.com/hexhacking/xCrash/blob/4748d183c1395c54bfb760ec6c454966d52ab73f/src/native/libxcrash/jni/xc_dl.c) 模块，用它来查询系统库的符号，这个模块在性能和兼容性上都有一些问题。xCrash 2.x 使用它在 libart，libc 和 libc++ 中查询很少量的几个符号。
-
-后来，一些其他的项目开始单独使用 xc_dl 模块，其中也包含一些性能敏感的场景。这时候，我们开始意识到我们需要重写这个模块，并且我们需要一个更好的实现。

@@ -287,10 +287,3 @@ On success, `xdl_info()` returns `0`.  On failure, it returns `-1`.
 ## License
 
 xDL is MIT licensed, as found in the [LICENSE](LICENSE) file.
-
-
-## History
-
-[xCrash 2.x](https://github.com/hexhacking/xCrash/tree/4748d183c1395c54bfb760ec6c454966d52ab73f) contains a very rudimentary module [xc_dl](https://github.com/hexhacking/xCrash/blob/4748d183c1395c54bfb760ec6c454966d52ab73f/src/native/libxcrash/jni/xc_dl.c) for searching system library symbols, which has many problems in performance and compatibility. xCrash 2.x uses it to search a few symbols from libart, libc and libc++.
-
-Later, some other projects began to use the xc_dl module alone, including in some performance-sensitive usage scenarios. At this time, we began to realize that we need to rewrite this module, and we need a better implementation.
