@@ -523,17 +523,7 @@ static void *xdl_open_try_force(const char *filename) {
   if (NULL != self) return (void *)self;
 
   // try force dlopen()
-  void *linker_handle = xdl_linker_force_dlopen(filename);
-  if (NULL == linker_handle) return NULL;
-
-  // find again
-  self = xdl_find(filename);
-  if (NULL == self)
-    dlclose(linker_handle);
-  else
-    self->linker_handle = linker_handle;
-
-  return (void *)self;
+  return xdl_open_always_force(filename);
 }
 
 void *xdl_open(const char *filename, int flags) {
