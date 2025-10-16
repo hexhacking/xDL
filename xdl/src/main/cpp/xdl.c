@@ -476,7 +476,7 @@ static xdl_t *xdl_find(const char *filename) {
   // from auxv (linker, vDSO)
   xdl_t *self = NULL;
   if (xdl_util_ends_with(filename, XDL_UTIL_LINKER_BASENAME))
-    self = xdl_find_from_auxv(AT_BASE, XDL_UTIL_LINKER_PATHNAME);
+    self = xdl_find_from_auxv(AT_BASE, xdl_get_linker_path());
   else if (xdl_util_ends_with(filename, XDL_UTIL_VDSO_BASENAME))
     self = xdl_find_from_auxv(AT_SYSINFO_EHDR, XDL_UTIL_VDSO_BASENAME);
 
