@@ -192,7 +192,7 @@ static int xdl_iterate_by_linker(xdl_iterate_phdr_cb_t cb, void *cb_arg, int fla
   uintptr_t linker_base = xdl_iterate_get_linker_base();
   if (0 != linker_base) {
     if (0 !=
-        (r = xdl_iterate_do_callback(cb, cb_arg, linker_base, XDL_UTIL_LINKER_PATHNAME, &linker_load_bias)))
+        (r = xdl_iterate_do_callback(cb, cb_arg, linker_base, xdl_get_linker_path(), &linker_load_bias)))
       return r;
   }
 
