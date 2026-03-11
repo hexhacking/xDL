@@ -74,6 +74,8 @@ size_t xdl_util_trim_ending(char *start);
 
 int xdl_util_get_api_level(void);
 
+size_t xdl_util_get_pagesize(void);
+
 #ifdef __cplusplus
 }
 #endif

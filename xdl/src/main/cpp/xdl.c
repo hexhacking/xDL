@@ -78,9 +78,11 @@ typedef struct xdl {
   // (1) for searching symbols from .dynsym
   //
 
-  bool dynsym_try_load;
-  ElfW(Sym) *dynsym;   // .dynsym
+  bool dynsym_loaded;
+  pthread_mutex_t dynsym_load_lock;
+  ElfW(Sym) *dynsym;   // .dynsym, also used to confirm whether .dynsym has been loaded successfully
   const char *dynstr;  // .dynstr
+  size_t dynstr_sz;    // .dynstr size
 
   // .hash (SYSV hash for .dynstr)
   struct {
@@ -105,13 +107,13 @@ typedef struct xdl {
   // (2) for searching symbols from .symtab
   //
 
-  bool symtab_try_load;
+  bool symtab_loaded;
+  pthread_mutex_t symtab_load_lock;
   uintptr_t base;
-
-  ElfW(Sym) *symtab;  // .symtab
-  size_t symtab_cnt;
-  char *strtab;  // .strtab
-  size_t strtab_sz;
+  ElfW(Sym) *symtab;  // .symtab, also used to confirm whether .symtab has been loaded successfully
+  size_t symtab_cnt;  // .symtab count
+  char *strtab;       // .strtab
+  size_t strtab_sz;   // .strtab size
 } xdl_t;
 
 #pragma clang diagnostic pop
@@ -120,7 +122,7 @@ static ElfW(Sym) *xdl_sym_by_addr(void *handle, void *addr);
 static ElfW(Sym) *xdl_dsym_by_addr(void *handle, void *addr);
 
 // load from memory
-static int xdl_dynsym_load(xdl_t *self) {
+static void xdl_dynsym_load(xdl_t *self) {
   // find the dynamic segment
   ElfW(Dyn) *dynamic = NULL;
   for (size_t i = 0; i < self->dlpi_phnum; i++) {
@@ -130,7 +132,7 @@ static int xdl_dynsym_load(xdl_t *self) {
       break;
     }
   }
-  if (NULL == dynamic) return -1;
+  if (NULL == dynamic) return;
 
   // iterate the dynamic segment
   for (ElfW(Dyn) *entry = dynamic; entry && entry->d_tag != DT_NULL; entry++) {
@@ -140,6 +142,9 @@ static int xdl_dynsym_load(xdl_t *self) {
         break;
       case DT_STRTAB:  //.dynstr
         self->dynstr = (const char *)(self->load_bias + entry->d_un.d_ptr);
+        break;
+      case DT_STRSZ:  //.dynstr size
+        self->dynstr_sz = (size_t)entry->d_un.d_val;
         break;
       case DT_HASH:  //.hash
         self->sysv_hash.buckets_cnt = ((const uint32_t *)(self->load_bias + entry->d_un.d_ptr))[0];
@@ -161,22 +166,20 @@ static int xdl_dynsym_load(xdl_t *self) {
     }
   }
 
-  if (NULL == self->dynsym || NULL == self->dynstr ||
+  if (NULL == self->dynsym || NULL == self->dynstr || 0 == self->dynstr_sz ||
       (0 == self->sysv_hash.buckets_cnt && 0 == self->gnu_hash.buckets_cnt)) {
     self->dynsym = NULL;
     self->dynstr = NULL;
+    self->dynstr_sz = 0;
     self->sysv_hash.buckets_cnt = 0;
     self->gnu_hash.buckets_cnt = 0;
-    return -1;
   }
-
-  return 0;
 }
 
 static void *xdl_read_file_to_heap(int file_fd, size_t file_sz, size_t data_offset, size_t data_len) {
   if (0 == data_len) return NULL;
   if (data_offset >= file_sz) return NULL;
-  if (data_offset + data_len > file_sz) return NULL;
+  if (data_len > file_sz - data_offset) return NULL;
 
   if (data_offset != (size_t)lseek(file_fd, (off_t)data_offset, SEEK_SET)) return NULL;
 
@@ -202,7 +205,7 @@ static void *xdl_read_file_to_heap_by_section(int file_fd, size_t file_sz, ElfW(
 static void *xdl_read_memory_to_heap(void *mem, size_t mem_sz, size_t data_offset, size_t data_len) {
   if (0 == data_len) return NULL;
   if (data_offset >= mem_sz) return NULL;
-  if (data_offset + data_len > mem_sz) return NULL;
+  if (data_len > mem_sz - data_offset) return NULL;
 
   void *data = malloc(data_len);
   if (NULL == data) return NULL;
@@ -218,7 +221,7 @@ static void *xdl_read_memory_to_heap_by_section(void *mem, size_t mem_sz, ElfW(S
 static void *xdl_get_memory(void *mem, size_t mem_sz, size_t data_offset, size_t data_len) {
   if (0 == data_len) return NULL;
   if (data_offset >= mem_sz) return NULL;
-  if (data_offset + data_len > mem_sz) return NULL;
+  if (data_len > mem_sz - data_offset) return NULL;
 
   return (void *)((uintptr_t)mem + data_offset);
 }
@@ -254,11 +257,13 @@ static int xdl_symtab_load_from_debugdata(xdl_t *self, int file_fd, size_t file_
 
   // get .shstrtab
   if (SHN_UNDEF == ehdr->e_shstrndx || ehdr->e_shstrndx >= ehdr->e_shnum) goto end;
+  size_t shstrtab_sz = (shdrs + ehdr->e_shstrndx)->sh_size;
   char *shstrtab = (char *)xdl_get_memory_by_section(debugdata, debugdata_sz, shdrs + ehdr->e_shstrndx);
   if (NULL == shstrtab) goto end;
 
   // find .symtab & .strtab
   for (ElfW(Shdr) *shdr = shdrs; shdr < shdrs + ehdr->e_shnum; shdr++) {
+    if (shdr->sh_name >= shstrtab_sz) continue;
     char *shdr_name = shstrtab + shdr->sh_name;
 
     if (SHT_SYMTAB == shdr->sh_type && 0 == strcmp(".symtab", shdr_name)) {
@@ -294,10 +299,9 @@ end:
 }
 
 // load from disk and memory
-static int xdl_symtab_load(xdl_t *self) {
-  if ('[' == self->pathname[0]) return -1;
+static void xdl_symtab_load(xdl_t *self) {
+  if ('[' == self->pathname[0]) return;
 
-  int r = -1;
   ElfW(Shdr) *shdrs = NULL;
   char *shstrtab = NULL;
 
@@ -309,7 +313,7 @@ static int xdl_symtab_load(xdl_t *self) {
       if (vaddr_min > phdr->p_vaddr) vaddr_min = phdr->p_vaddr;
     }
   }
-  if (UINTPTR_MAX == vaddr_min) return -1;
+  if (UINTPTR_MAX == vaddr_min) return;
   self->base = self->load_bias + vaddr_min;
 
   // open file
@@ -324,11 +328,11 @@ static int xdl_symtab_load(xdl_t *self) {
     file_fd = open(full_pathname, flags);
     if (file_fd < 0) {
       // try the slow method
-      if (0 != xdl_iterate_get_full_pathname(self->base, full_pathname, sizeof(full_pathname))) return -1;
+      if (0 != xdl_iterate_get_full_pathname(self->base, full_pathname, sizeof(full_pathname))) return;
       file_fd = open(full_pathname, flags);
     }
   }
-  if (file_fd < 0) return -1;
+  if (file_fd < 0) return;
   struct stat st;
   if (0 != fstat(file_fd, &st)) goto end;
   size_t file_sz = (size_t)st.st_size;
@@ -344,11 +348,13 @@ static int xdl_symtab_load(xdl_t *self) {
 
   // get .shstrtab
   if (SHN_UNDEF == ehdr->e_shstrndx || ehdr->e_shstrndx >= ehdr->e_shnum) goto end;
+  size_t shstrtab_sz = (shdrs + ehdr->e_shstrndx)->sh_size;
   shstrtab = (char *)xdl_read_file_to_heap_by_section(file_fd, file_sz, shdrs + ehdr->e_shstrndx);
   if (NULL == shstrtab) goto end;
 
   // find .symtab & .strtab
   for (ElfW(Shdr) *shdr = shdrs; shdr < shdrs + ehdr->e_shnum; shdr++) {
+    if (shdr->sh_name >= shstrtab_sz) continue;
     char *shdr_name = shstrtab + shdr->sh_name;
 
     if (SHT_SYMTAB == shdr->sh_type && 0 == strcmp(".symtab", shdr_name)) {
@@ -371,12 +377,10 @@ static int xdl_symtab_load(xdl_t *self) {
       self->symtab_cnt = shdr->sh_size / shdr->sh_entsize;
       self->strtab = strtab;
       self->strtab_sz = shdr_strtab->sh_size;
-      r = 0;
       break;
     } else if (SHT_PROGBITS == shdr->sh_type && 0 == strcmp(".gnu_debugdata", shdr_name)) {
       if (0 == xdl_symtab_load_from_debugdata(self, file_fd, file_sz, shdr)) {
         // OK
-        r = 0;
         break;
       }
     }
@@ -386,7 +390,32 @@ end:
   close(file_fd);
   if (NULL != shdrs) free(shdrs);
   if (NULL != shstrtab) free(shstrtab);
-  return r;
+}
+
+static uintptr_t xdl_get_base_from_phdr(uintptr_t phdr) {
+  size_t phnum = (size_t)getauxval(AT_PHNUM);
+  const ElfW(Phdr) *ph = (const ElfW(Phdr) *)phdr;
+  uintptr_t base = 0;
+  size_t pagesize = xdl_util_get_pagesize();
+
+  for (size_t i = 0; i < phnum; i++) {
+    if (PT_PHDR == ph[i].p_type) {
+      base = phdr - ph[i].p_vaddr;
+      break;
+    }
+  }
+
+  // fallback
+  if (0 == base || 0 != (base & (pagesize - 1))) {
+    base = phdr - sizeof(ElfW(Ehdr));
+  }
+
+  // fallback
+  if (0 == base || 0 != (base & (pagesize - 1))) {
+    base = phdr & (~(pagesize - 1));
+  }
+
+  return base;
 }
 
 static xdl_t *xdl_find_from_auxv(unsigned long type, const char *pathname) {
@@ -396,7 +425,7 @@ static xdl_t *xdl_find_from_auxv(unsigned long type, const char *pathname) {
   if (0 == val) return NULL;
 
   // get base
-  uintptr_t base = (AT_PHDR == type ? (val & (~0xffful)) : val);
+  uintptr_t base = (AT_PHDR == type ? xdl_get_base_from_phdr(val) : val);
   if (0 != memcmp((void *)base, ELFMAG, SELFMAG)) return NULL;
 
   // ELF info
@@ -425,8 +454,10 @@ static xdl_t *xdl_find_from_auxv(unsigned long type, const char *pathname) {
   self->load_bias = load_bias;
   self->dlpi_phdr = dlpi_phdr;
   self->dlpi_phnum = dlpi_phnum;
-  self->dynsym_try_load = false;
-  self->symtab_try_load = false;
+  self->dynsym_loaded = false;
+  pthread_mutex_init(&self->dynsym_load_lock, NULL);
+  self->symtab_loaded = false;
+  pthread_mutex_init(&self->symtab_load_lock, NULL);
   return self;
 }
 
@@ -467,8 +498,10 @@ static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg
   (*self)->load_bias = info->dlpi_addr;
   (*self)->dlpi_phdr = info->dlpi_phdr;
   (*self)->dlpi_phnum = info->dlpi_phnum;
-  (*self)->dynsym_try_load = false;
-  (*self)->symtab_try_load = false;
+  (*self)->dynsym_loaded = false;
+  pthread_mutex_init(&(*self)->dynsym_load_lock, NULL);
+  (*self)->symtab_loaded = false;
+  pthread_mutex_init(&(*self)->symtab_load_lock, NULL);
   return 1;  // return OK
 }
 
@@ -538,6 +571,8 @@ void *xdl_open(const char *filename, int flags) {
 }
 
 void *xdl_open2(struct dl_phdr_info *info) {
+  if (NULL == info) return NULL;
+
   xdl_t *self = calloc(1, sizeof(xdl_t));
   if (NULL == self) return NULL;
   if (NULL == (self->pathname = strdup((const char *)info->dlpi_name))) {
@@ -547,8 +582,10 @@ void *xdl_open2(struct dl_phdr_info *info) {
   self->load_bias = info->dlpi_addr;
   self->dlpi_phdr = info->dlpi_phdr;
   self->dlpi_phnum = info->dlpi_phnum;
-  self->dynsym_try_load = false;
-  self->symtab_try_load = false;
+  self->dynsym_loaded = false;
+  pthread_mutex_init(&self->dynsym_load_lock, NULL);
+  self->symtab_loaded = false;
+  pthread_mutex_init(&self->symtab_load_lock, NULL);
   return self;
 }
 
@@ -559,6 +596,8 @@ void *xdl_close(void *handle) {
   if (NULL != self->pathname) free(self->pathname);
   if (NULL != self->symtab) free(self->symtab);
   if (NULL != self->strtab) free(self->strtab);
+  pthread_mutex_destroy(&self->dynsym_load_lock);
+  pthread_mutex_destroy(&self->symtab_load_lock);
 
   void *linker_handle = self->linker_handle;
   free(self);
@@ -592,6 +631,7 @@ static ElfW(Sym) *xdl_dynsym_find_symbol_use_sysv_hash(xdl_t *self, const char *
   for (uint32_t i = self->sysv_hash.buckets[hash % self->sysv_hash.buckets_cnt]; 0 != i;
        i = self->sysv_hash.chains[i]) {
     ElfW(Sym) *sym = self->dynsym + i;
+    if (sym->st_name >= self->dynstr_sz) continue;
     if (0 != strcmp(self->dynstr + sym->st_name, sym_name)) continue;
     return sym;
   }
@@ -620,7 +660,7 @@ static ElfW(Sym) *xdl_dynsym_find_symbol_use_gnu_hash(xdl_t *self, const char *s
     uint32_t sym_hash = self->gnu_hash.chains[i - self->gnu_hash.symoffset];
 
     if ((hash | (uint32_t)1) == (sym_hash | (uint32_t)1)) {
-      if (0 == strcmp(self->dynstr + sym->st_name, sym_name)) {
+      if (sym->st_name < self->dynstr_sz && 0 == strcmp(self->dynstr + sym->st_name, sym_name)) {
         return sym;
       }
     }
@@ -661,11 +701,11 @@ static void *xdl_resolve_symbol_address(xdl_t *self, ElfW(Sym) *sym, size_t *sym
       typedef void *(*ifunc_resolver_t)(uint64_t, xdl_ifunc_arg_t *);
       static xdl_ifunc_arg_t arg;
       static bool initialized = false;
-      if (!initialized) {
+      if (!__atomic_load_n(&initialized, __ATOMIC_ACQUIRE)) {
         arg.size = sizeof(xdl_ifunc_arg_t);
         arg.hwcap = getauxval(AT_HWCAP);
         arg.hwcap2 = getauxval(AT_HWCAP2);
-        initialized = true;
+        __atomic_store_n(&initialized, true, __ATOMIC_RELEASE);
       }
       real_sym_addr = ((ifunc_resolver_t)sym_addr)(arg.hwcap | XDL_IFUNC_ARG_HWCAP, &arg);
 #elif defined(__arm__)
@@ -673,9 +713,9 @@ static void *xdl_resolve_symbol_address(xdl_t *self, ElfW(Sym) *sym, size_t *sym
       typedef void *(*ifunc_resolver_t)(unsigned long);
       static unsigned long hwcap;
       static bool initialized = false;
-      if (!initialized) {
+      if (!__atomic_load_n(&initialized, __ATOMIC_ACQUIRE)) {
         hwcap = getauxval(AT_HWCAP);
-        initialized = true;
+        __atomic_store_n(&initialized, true, __ATOMIC_RELEASE);
       }
       real_sym_addr = ((ifunc_resolver_t)sym_addr)(hwcap);
 #else
@@ -695,6 +735,28 @@ static void *xdl_resolve_symbol_address(xdl_t *self, ElfW(Sym) *sym, size_t *sym
   }
 }
 
+static void xdl_ensure_dynsym_loaded(xdl_t *self) {
+  if (!__atomic_load_n(&self->dynsym_loaded, __ATOMIC_ACQUIRE)) {
+    pthread_mutex_lock(&self->dynsym_load_lock);
+    if (!__atomic_load_n(&self->dynsym_loaded, __ATOMIC_RELAXED)) {
+      xdl_dynsym_load(self);
+      __atomic_store_n(&self->dynsym_loaded, true, __ATOMIC_RELEASE);
+    }
+    pthread_mutex_unlock(&self->dynsym_load_lock);
+  }
+}
+
+static void xdl_ensure_symtab_loaded(xdl_t *self) {
+  if (!__atomic_load_n(&self->symtab_loaded, __ATOMIC_ACQUIRE)) {
+    pthread_mutex_lock(&self->symtab_load_lock);
+    if (!__atomic_load_n(&self->symtab_loaded, __ATOMIC_RELAXED)) {
+      xdl_symtab_load(self);
+      __atomic_store_n(&self->symtab_loaded, true, __ATOMIC_RELEASE);
+    }
+    pthread_mutex_unlock(&self->symtab_load_lock);
+  }
+}
+
 void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size) {
   if (NULL == handle || NULL == symbol) return NULL;
   if (NULL != symbol_size) *symbol_size = 0;
@@ -702,13 +764,10 @@ void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size) {
   xdl_t *self = (xdl_t *)handle;
 
   // load .dynsym only once
-  if (!self->dynsym_try_load) {
-    self->dynsym_try_load = true;
-    if (0 != xdl_dynsym_load(self)) return NULL;
-  }
+  xdl_ensure_dynsym_loaded(self);
+  if (NULL == self->dynsym) return NULL;
 
   // find symbol
-  if (NULL == self->dynsym) return NULL;
   ElfW(Sym) *sym = NULL;
   if (self->gnu_hash.buckets_cnt > 0) {
     // use GNU hash (.gnu.hash -> .dynsym -> .dynstr), O(x) + O(1) + O(1)
@@ -773,23 +832,19 @@ void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size) {
   xdl_t *self = (xdl_t *)handle;
 
   // load .symtab only once
-  if (!self->symtab_try_load) {
-    self->symtab_try_load = true;
-    if (0 != xdl_symtab_load(self)) return NULL;
-  }
+  xdl_ensure_symtab_loaded(self);
+  if (NULL == self->symtab) return NULL;
 
   // find symbol
-  if (NULL == self->symtab) return NULL;
   size_t symbol_len = strlen(symbol);
   for (size_t i = 0; i < self->symtab_cnt; i++) {
     ElfW(Sym) *sym = self->symtab + i;
 
     if (!XDL_SYMTAB_IS_EXPORT_SYM(sym->st_shndx)) continue;
-    // if (0 != strncmp(self->strtab + sym->st_name, symbol, self->strtab_sz - sym->st_name)) continue;
+    if (sym->st_name >= self->strtab_sz) continue;
     if (!xdl_dsym_is_match(self->strtab + sym->st_name, symbol, symbol_len)) continue;
 
-    if (NULL != symbol_size) *symbol_size = sym->st_size;
-    return (void *)(self->load_bias + sym->st_value);
+    return xdl_resolve_symbol_address(self, sym, symbol_size);
   }
 
   return NULL;
@@ -830,8 +885,10 @@ static int xdl_open_by_addr_iterate_cb(struct dl_phdr_info *info, size_t size, v
     (*self)->load_bias = info->dlpi_addr;
     (*self)->dlpi_phdr = info->dlpi_phdr;
     (*self)->dlpi_phnum = info->dlpi_phnum;
-    (*self)->dynsym_try_load = false;
-    (*self)->symtab_try_load = false;
+    (*self)->dynsym_loaded = false;
+    pthread_mutex_init(&(*self)->dynsym_load_lock, NULL);
+    (*self)->symtab_loaded = false;
+    pthread_mutex_init(&(*self)->symtab_load_lock, NULL);
     return 1;  // OK
   }
 
@@ -873,13 +930,10 @@ static ElfW(Sym) *xdl_sym_by_addr(void *handle, void *addr) {
   xdl_t *self = (xdl_t *)handle;
 
   // load .dynsym only once
-  if (!self->dynsym_try_load) {
-    self->dynsym_try_load = true;
-    if (0 != xdl_dynsym_load(self)) return NULL;
-  }
+  xdl_ensure_dynsym_loaded(self);
+  if (NULL == self->dynsym) return NULL;
 
   // find symbol
-  if (NULL == self->dynsym) return NULL;
   uintptr_t offset = (uintptr_t)addr - self->load_bias;
   if (self->gnu_hash.buckets_cnt > 0) {
     const uint32_t *chains_all = self->gnu_hash.chains - self->gnu_hash.symoffset;
@@ -905,13 +959,10 @@ static ElfW(Sym) *xdl_dsym_by_addr(void *handle, void *addr) {
   xdl_t *self = (xdl_t *)handle;
 
   // load .symtab only once
-  if (!self->symtab_try_load) {
-    self->symtab_try_load = true;
-    if (0 != xdl_symtab_load(self)) return NULL;
-  }
+  xdl_ensure_symtab_loaded(self);
+  if (NULL == self->symtab) return NULL;
 
   // find symbol
-  if (NULL == self->symtab) return NULL;
   uintptr_t offset = (uintptr_t)addr - self->load_bias;
   for (size_t i = 0; i < self->symtab_cnt; i++) {
     ElfW(Sym) *sym = self->symtab + i;
@@ -928,7 +979,7 @@ int xdl_addr(void *addr, xdl_info_t *info, void **cache) {
 int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags) {
   if (NULL == addr || NULL == info || NULL == cache) return 0;
 
-  memset(info, 0, sizeof(Dl_info));
+  memset(info, 0, sizeof(xdl_info_t));
 
   // find handle from cache
   xdl_t *handle = NULL;
@@ -956,11 +1007,17 @@ int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags) {
   if (!(flags & XDL_NON_SYM)) {
     ElfW(Sym) *sym;
     if (NULL != (sym = xdl_sym_by_addr((void *)handle, addr))) {
-      info->dli_sname = handle->dynstr + sym->st_name;
+      if (sym->st_name < handle->dynstr_sz)
+        info->dli_sname = handle->dynstr + sym->st_name;
+      else
+        info->dli_sname = "dynstr_out_of_bounds_error";
       info->dli_saddr = (void *)(handle->load_bias + sym->st_value);
       info->dli_ssize = sym->st_size;
     } else if (NULL != (sym = xdl_dsym_by_addr((void *)handle, addr))) {
-      info->dli_sname = handle->strtab + sym->st_name;
+      if (sym->st_name < handle->strtab_sz)
+        info->dli_sname = handle->strtab + sym->st_name;
+      else
+        info->dli_sname = "strtab_out_of_bounds_error";
       info->dli_saddr = (void *)(handle->load_bias + sym->st_value);
       info->dli_ssize = sym->st_size;
     }

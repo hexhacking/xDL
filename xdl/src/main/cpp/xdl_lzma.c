@@ -123,18 +123,21 @@ int xdl_lzma_decompress(uint8_t *src, size_t src_size, uint8_t **dst, size_t *ds
   size_t src_remaining;
   size_t dst_remaining;
   ISzAlloc alloc = {.Alloc = xdl_lzma_internal_alloc, .Free = xdl_lzma_internal_free};
-  long long state[4096 / sizeof(long long)];  // must be enough, 8-bit aligned
   ECoderStatus status;
   int api_level = xdl_util_get_api_level();
+
+  // This is not a bug; it has proven to be safe and feasible on these products.
+  // We currently lack a convenient method to obtain the size of the system's LZMA state structure at runtime.
+  long long state[4096 / sizeof(long long)];
 
   // init and check
   static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
   static bool inited = false;
-  if (!inited) {
+  if (!__atomic_load_n(&inited, __ATOMIC_ACQUIRE)) {
     pthread_mutex_lock(&lock);
-    if (!inited) {
+    if (!__atomic_load_n(&inited, __ATOMIC_RELAXED)) {
       xdl_lzma_init();
-      inited = true;
+      __atomic_store_n(&inited, true, __ATOMIC_RELEASE);
     }
     pthread_mutex_unlock(&lock);
   }
@@ -142,7 +145,7 @@ int xdl_lzma_decompress(uint8_t *src, size_t src_size, uint8_t **dst, size_t *ds
 
   xdl_lzma_construct(&state, &alloc);
 
-  *dst_size = 2 * src_size;
+  *dst_size = src_size;
   *dst = NULL;
   do {
     *dst_size *= 2;
@@ -174,12 +177,13 @@ int xdl_lzma_decompress(uint8_t *src, size_t src_size, uint8_t **dst, size_t *ds
     dst_offset += dst_remaining;
   } while (status == CODER_STATUS_NOT_FINISHED);
 
-  xdl_lzma_free(&state);
-
   if (!xdl_lzma_isfinished(&state)) {
+    xdl_lzma_free(&state);
     free(*dst);
     return -1;
   }
+
+  xdl_lzma_free(&state);
 
   *dst_size = dst_offset;
   *dst = realloc(*dst, *dst_size);

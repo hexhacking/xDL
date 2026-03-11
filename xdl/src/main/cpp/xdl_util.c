@@ -26,6 +26,7 @@
 #include <android/api-level.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -80,16 +81,37 @@ end:
 }
 
 int xdl_util_get_api_level(void) {
-  static int xdl_util_api_level = -1;
+  static int api_level = -1;
+  static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
-  if (xdl_util_api_level < 0) {
-    int api_level = android_get_device_api_level();
-    if (api_level < 0)
-      api_level = xdl_util_get_api_level_from_build_prop();  // compatible with unusual models
-    if (api_level < __ANDROID_API_J__) api_level = __ANDROID_API_J__;
-
-    __atomic_store_n(&xdl_util_api_level, api_level, __ATOMIC_SEQ_CST);
+  int val = __atomic_load_n(&api_level, __ATOMIC_ACQUIRE);
+  if (val < 0) {
+    pthread_mutex_lock(&lock);
+    val = __atomic_load_n(&api_level, __ATOMIC_RELAXED);
+    if (val < 0) {
+      val = android_get_device_api_level();
+      if (val < 0) val = xdl_util_get_api_level_from_build_prop();
+      if (val < __ANDROID_API_J__) val = __ANDROID_API_J__;
+      __atomic_store_n(&api_level, val, __ATOMIC_RELEASE);
+    }
+    pthread_mutex_unlock(&lock);
   }
+  return val;
+}
 
-  return xdl_util_api_level;
+size_t xdl_util_get_pagesize(void) {
+  static size_t pagesize = 0;
+  static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+  size_t val = __atomic_load_n(&pagesize, __ATOMIC_ACQUIRE);
+  if (0 == val) {
+    pthread_mutex_lock(&lock);
+    val = __atomic_load_n(&pagesize, __ATOMIC_RELAXED);
+    if (0 == val) {
+      val = (size_t)getpagesize();
+      __atomic_store_n(&pagesize, val, __ATOMIC_RELEASE);
+    }
+    pthread_mutex_unlock(&lock);
+  }
+  return val;
 }

@@ -128,6 +128,9 @@ static int xdl_iterate_by_linker_cb(struct dl_phdr_info *info, size_t size, void
   info = &info_fixed;
 
   // fix dlpi_phdr & dlpi_phnum (from memory)
+  //
+  // This is not a bug. Because we cannot obtain dlpi_phdr, we cannot correctly calculate load_bias.
+  // We can only assume that load_bias and base are consistent for now.
   if (NULL == info->dlpi_phdr || 0 == info->dlpi_phnum) {
     ElfW(Ehdr) *ehdr = (ElfW(Ehdr) *)info->dlpi_addr;
     info->dlpi_phdr = (ElfW(Phdr) *)(info->dlpi_addr + ehdr->e_phoff);
@@ -143,7 +146,7 @@ static int xdl_iterate_by_linker_cb(struct dl_phdr_info *info, size_t size, void
     for (size_t i = 0; i < info->dlpi_phnum; i++) {
       const ElfW(Phdr) *phdr = &(info->dlpi_phdr[i]);
       if (PT_DYNAMIC == phdr->p_type) {
-        dynamic = (ElfW(Dyn) *) (info->dlpi_addr + phdr->p_vaddr);
+        dynamic = (ElfW(Dyn) *)(info->dlpi_addr + phdr->p_vaddr);
         break;
       }
     }
@@ -155,18 +158,18 @@ static int xdl_iterate_by_linker_cb(struct dl_phdr_info *info, size_t size, void
       for (ElfW(Dyn) *entry = dynamic; entry && entry->d_tag != DT_NULL; entry++) {
         switch (entry->d_tag) {
           case DT_STRTAB:
-            dynstr = (const char *) (info->dlpi_addr + entry->d_un.d_ptr);
+            dynstr = (const char *)(info->dlpi_addr + entry->d_un.d_ptr);
             break;
           case DT_SONAME:
-            soname_off = (ssize_t) entry->d_un.d_val;
+            soname_off = (ssize_t)entry->d_un.d_val;
             break;
           default:
             break;
         }
       }
       if (NULL != dynstr && soname_off >= 0) {
-        snprintf(name_fixed, sizeof(name_fixed), "%s!/lib/" XDL_UTIL_ABI_STR "/%s",
-                 info->dlpi_name, dynstr + (size_t) soname_off);
+        snprintf(name_fixed, sizeof(name_fixed), "%s!/lib/" XDL_UTIL_ABI_STR "/%s", info->dlpi_name,
+                 dynstr + (size_t)soname_off);
         info->dlpi_name = name_fixed;
       }
     }
@@ -180,6 +183,7 @@ static int xdl_iterate_by_linker_cb(struct dl_phdr_info *info, size_t size, void
     if (UINTPTR_MAX == min_vaddr) return 0;  // ignore this ELF
     uintptr_t base = (uintptr_t)(info->dlpi_addr + min_vaddr);
 
+    // This is not a bug. dlpi_name can only be used during the callback.
     char buf[1024];
     if (0 != xdl_iterate_get_pathname_from_maps(base, buf, sizeof(buf), maps)) return 0;  // ignore this ELF
 

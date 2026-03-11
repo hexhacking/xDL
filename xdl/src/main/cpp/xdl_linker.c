@@ -113,11 +113,11 @@ static void xdl_linker_init_symbols_impl(void) {
 static void xdl_linker_init_symbols(void) {
   static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
   static bool inited = false;
-  if (!inited) {
+  if (!__atomic_load_n(&inited, __ATOMIC_ACQUIRE)) {
     pthread_mutex_lock(&lock);
-    if (!inited) {
+    if (!__atomic_load_n(&inited, __ATOMIC_RELAXED)) {
       xdl_linker_init_symbols_impl();
-      inited = true;
+      __atomic_store_n(&inited, true, __ATOMIC_RELEASE);
     }
     pthread_mutex_unlock(&lock);
   }
@@ -183,11 +183,11 @@ static void xdl_linker_init_caller_addr_impl(void) {
 static void xdl_linker_init_caller_addr(void) {
   static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
   static bool inited = false;
-  if (!inited) {
+  if (!__atomic_load_n(&inited, __ATOMIC_ACQUIRE)) {
     pthread_mutex_lock(&lock);
-    if (!inited) {
+    if (!__atomic_load_n(&inited, __ATOMIC_RELAXED)) {
       xdl_linker_init_caller_addr_impl();
-      inited = true;
+      __atomic_store_n(&inited, true, __ATOMIC_RELEASE);
     }
     pthread_mutex_unlock(&lock);
   }
