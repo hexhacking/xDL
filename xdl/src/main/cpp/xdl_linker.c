@@ -229,3 +229,18 @@ void *xdl_linker_force_dlopen(const char *filename) {
     return handle;
   }
 }
+
+const char* xdl_get_linker_path(void) {
+#if defined(__arm__)
+  struct stat st;
+  if (stat("/system/lib/libndk_translation.so", &st) == 0)
+    return XDL_UTIL_LINKER_PATHNAME_ARM;
+  else
+#elif defined(__aarch64__)
+  struct stat st;
+  if (stat("/system/lib64/libndk_translation.so", &st) == 0)
+    return XDL_UTIL_LINKER_PATHNAME_ARM;
+  else
+#endif
+    return XDL_UTIL_LINKER_PATHNAME;
+}
