@@ -31,6 +31,7 @@
 #ifndef __LP64__
 #define XDL_UTIL_LINKER_BASENAME        "linker"
 #define XDL_UTIL_LINKER_PATHNAME        "/system/bin/linker"
+#define XDL_UTIL_LINKER_PATHNAME_ARM    "/system/bin/arm/linker"
 #define XDL_UTIL_APP_PROCESS_BASENAME   "app_process32"
 #define XDL_UTIL_APP_PROCESS_PATHNAME   "/system/bin/app_process32"
 #define XDL_UTIL_APP_PROCESS_BASENAME_K "app_process"
@@ -38,6 +39,7 @@
 #else
 #define XDL_UTIL_LINKER_BASENAME      "linker64"
 #define XDL_UTIL_LINKER_PATHNAME      "/system/bin/linker64"
+#define XDL_UTIL_LINKER_PATHNAME_ARM  "/system/bin/arm64/linker"
 #define XDL_UTIL_APP_PROCESS_BASENAME "app_process64"
 #define XDL_UTIL_APP_PROCESS_PATHNAME "/system/bin/app_process64"
 #endif
