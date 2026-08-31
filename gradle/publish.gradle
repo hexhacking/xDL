@@ -28,9 +28,9 @@ project.afterEvaluate {
             release(MavenPublication) {
                 from components.release
 
-                groupId POM_GROUP_ID
-                artifactId POM_ARTIFACT_ID
-                version POM_VERSION_NAME
+                groupId = POM_GROUP_ID
+                artifactId = POM_ARTIFACT_ID
+                version = POM_VERSION_NAME
 
                 pom {
                     name = POM_NAME
@@ -71,8 +71,8 @@ project.afterEvaluate {
                 url = POM_VERSION_NAME.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
 
                 credentials {
-                    username ossrhUsername
-                    password ossrhPassword
+                    username = ossrhUsername
+                    password = ossrhPassword
                 }
             }
         }

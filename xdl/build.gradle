@@ -3,13 +3,13 @@ plugins {
 }
 
 android {
-    namespace 'io.github.hexhacking.xdl'
-    compileSdk rootProject.ext.compileSdkVersion
+    namespace = 'io.github.hexhacking.xdl'
+    compileSdk = rootProject.ext.compileSdkVersion
     buildToolsVersion = rootProject.ext.buildToolsVersion
-    ndkVersion rootProject.ext.ndkVersion
+    ndkVersion = rootProject.ext.ndkVersion
+    enableKotlin = false
     defaultConfig {
         minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
         externalNativeBuild {
             cmake {
                 abiFilters rootProject.ext.abiFilters.split(",")
@@ -24,7 +24,7 @@ android {
     externalNativeBuild {
         cmake {
             path "src/main/cpp/CMakeLists.txt"
-            version rootProject.ext.cmakeVersion
+            version = rootProject.ext.cmakeVersion
         }
     }
     compileOptions {
@@ -40,12 +40,12 @@ android {
         }
     }
     buildFeatures {
-        prefabPublishing true
-        buildConfig false
+        prefabPublishing = true
+        buildConfig = false
     }
     prefab {
         xdl {
-            headers "src/main/cpp/include"
+            headers = "src/main/cpp/include"
         }
     }
     publishing {
@@ -53,6 +53,12 @@ android {
             withSourcesJar()
             withJavadocJar()
         }
+    }
+    lint {
+        targetSdk rootProject.ext.targetSdkVersion
+    }
+    testOptions {
+        targetSdk rootProject.ext.targetSdkVersion
     }
 }
 

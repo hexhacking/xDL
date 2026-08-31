@@ -3,10 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'io.github.hexhacking.xdl.sample'
-    compileSdk rootProject.ext.compileSdkVersion
+    namespace = 'io.github.hexhacking.xdl.sample'
+    compileSdk = rootProject.ext.compileSdkVersion
     buildToolsVersion = rootProject.ext.buildToolsVersion
-    ndkVersion rootProject.ext.ndkVersion
+    ndkVersion = rootProject.ext.ndkVersion
+    enableKotlin = false
     defaultConfig {
         applicationId "io.github.hexhacking.xdl.sample"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -28,7 +29,7 @@ android {
     externalNativeBuild {
         cmake {
             path "src/main/cpp/CMakeLists.txt"
-            version rootProject.ext.cmakeVersion
+            version = rootProject.ext.cmakeVersion
         }
 //        ndkBuild {
 //            path "src/main/cpp/Android.mk"
@@ -43,7 +44,7 @@ android {
             minifyEnabled false
         }
         release {
-            minifyEnabled false
+            minifyEnabled true
         }
     }
     packagingOptions {
@@ -55,7 +56,7 @@ android {
         }
     }
     buildFeatures {
-        prefab true
+        prefab = true
     }
 }
 
