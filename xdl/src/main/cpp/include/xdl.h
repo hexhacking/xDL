@@ -76,14 +76,11 @@ void xdl_preload(void *handle);
 //
 // symbol iterator
 //
-void xdl_iterate_sym(void *handle,
-                     int (*callback)(void *addr, const char *symbol, size_t symbol_size, unsigned char type,
-                                     unsigned char bind, unsigned char visibility, void *data),
-                     void *data);
-void xdl_iterate_dsym(void *handle,
-                      int (*callback)(void *addr, const char *symbol, size_t symbol_size, unsigned char type,
-                                      unsigned char bind, unsigned char visibility, void *data),
-                      void *data);
+typedef int (*xdl_iterate_sym_callback_t)(void *addr, const char *symbol, size_t symbol_size,
+                                          unsigned char type, unsigned char bind, unsigned char visibility,
+                                          void *data);
+void xdl_iterate_sym(void *handle, xdl_iterate_sym_callback_t callback, void *data);
+void xdl_iterate_dsym(void *handle, xdl_iterate_sym_callback_t callback, void *data);
 
 //
 // Enhanced dladdr().

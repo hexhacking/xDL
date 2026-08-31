@@ -1181,10 +1181,7 @@ void xdl_dump(void) {
 }
 
 static int xdl_iterate_sym_callback(xdl_t *self, ElfW(Sym) *sym, bool is_symtab,
-                                    int (*callback)(void *addr, const char *symbol, size_t symbol_size,
-                                                    unsigned char type, unsigned char bind,
-                                                    unsigned char visibility, void *data),
-                                    void *data) {
+                                    xdl_iterate_sym_callback_t callback, void *data) {
   const char *symbol;
   if (is_symtab) {
     if (!XDL_SYMTAB_IS_EXPORT_SYM(sym->st_shndx)) return 0;
@@ -1205,10 +1202,7 @@ static int xdl_iterate_sym_callback(xdl_t *self, ElfW(Sym) *sym, bool is_symtab,
                   data);
 }
 
-void xdl_iterate_sym(void *handle,
-                     int (*callback)(void *addr, const char *symbol, size_t symbol_size, unsigned char type,
-                                     unsigned char bind, unsigned char visibility, void *data),
-                     void *data) {
+void xdl_iterate_sym(void *handle, xdl_iterate_sym_callback_t callback, void *data) {
   if (NULL == handle || NULL == callback) return;
 
   xdl_t *self = xdl_queue_find(handle);
@@ -1237,10 +1231,7 @@ void xdl_iterate_sym(void *handle,
   }
 }
 
-void xdl_iterate_dsym(void *handle,
-                      int (*callback)(void *addr, const char *symbol, size_t symbol_size, unsigned char type,
-                                      unsigned char bind, unsigned char visibility, void *data),
-                      void *data) {
+void xdl_iterate_dsym(void *handle, xdl_iterate_sym_callback_t callback, void *data) {
   if (NULL == handle || NULL == callback) return;
 
   xdl_t *self = xdl_queue_find(handle);
