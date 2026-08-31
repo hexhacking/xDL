@@ -57,6 +57,10 @@
 #define XDL_LIB_PATH "/system/lib64"
 #endif
 
+#ifndef ELF_ST_VISIBILITY
+#define ELF_ST_VISIBILITY(o) ((o) & 0x3)
+#endif
+
 #define XDL_DYNSYM_IS_EXPORT_SYM(shndx) (SHN_UNDEF != (shndx))
 #define XDL_SYMTAB_IS_EXPORT_SYM(shndx) \
   (SHN_UNDEF != (shndx) && !((shndx) >= SHN_LORESERVE && (shndx) <= SHN_HIRESERVE))
@@ -1174,4 +1178,81 @@ void xdl_dump(void) {
         self->load_bias, self->handle, self->ref_count);
   }
   pthread_mutex_unlock(&xdls_lock);
+}
+
+static int xdl_iterate_sym_callback(xdl_t *self, ElfW(Sym) *sym, bool is_symtab,
+                                    int (*callback)(void *addr, const char *symbol, size_t symbol_size,
+                                                    unsigned char type, unsigned char bind,
+                                                    unsigned char visibility, void *data),
+                                    void *data) {
+  const char *symbol;
+  if (is_symtab) {
+    if (!XDL_SYMTAB_IS_EXPORT_SYM(sym->st_shndx)) return 0;
+    if (sym->st_name < self->strtab_sz)
+      symbol = self->strtab + sym->st_name;
+    else
+      symbol = "strtab_out_of_bounds_error";
+  } else {
+    if (!XDL_DYNSYM_IS_EXPORT_SYM(sym->st_shndx)) return 0;
+    if (sym->st_name < self->dynstr_sz)
+      symbol = self->dynstr + sym->st_name;
+    else
+      symbol = "dynstr_out_of_bounds_error";
+  }
+
+  return callback((void *)(self->load_bias + sym->st_value), symbol, (size_t)sym->st_size,
+                  ELF_ST_TYPE(sym->st_info), ELF_ST_BIND(sym->st_info), ELF_ST_VISIBILITY(sym->st_other),
+                  data);
+}
+
+void xdl_iterate_sym(void *handle,
+                     int (*callback)(void *addr, const char *symbol, size_t symbol_size, unsigned char type,
+                                     unsigned char bind, unsigned char visibility, void *data),
+                     void *data) {
+  if (NULL == handle || NULL == callback) return;
+
+  xdl_t *self = xdl_queue_find(handle);
+  if (NULL == self) return;
+
+  // load .dynsym only once
+  xdl_ensure_dynsym_loaded(self);
+  if (NULL == self->dynsym) return;
+
+  // iterate symbols
+  if (self->gnu_hash.buckets_cnt > 0) {
+    const uint32_t *chains_all = self->gnu_hash.chains - self->gnu_hash.symoffset;
+    for (size_t i = 0; i < self->gnu_hash.buckets_cnt; i++) {
+      uint32_t n = self->gnu_hash.buckets[i];
+      if (n < self->gnu_hash.symoffset) continue;
+      do {
+        ElfW(Sym) *sym = self->dynsym + n;
+        if (0 != xdl_iterate_sym_callback(self, sym, false, callback, data)) return;
+      } while ((chains_all[n++] & 1) == 0);
+    }
+  } else if (self->sysv_hash.chains_cnt > 0) {
+    for (size_t i = 0; i < self->sysv_hash.chains_cnt; i++) {
+      ElfW(Sym) *sym = self->dynsym + i;
+      if (0 != xdl_iterate_sym_callback(self, sym, false, callback, data)) return;
+    }
+  }
+}
+
+void xdl_iterate_dsym(void *handle,
+                      int (*callback)(void *addr, const char *symbol, size_t symbol_size, unsigned char type,
+                                      unsigned char bind, unsigned char visibility, void *data),
+                      void *data) {
+  if (NULL == handle || NULL == callback) return;
+
+  xdl_t *self = xdl_queue_find(handle);
+  if (NULL == self) return;
+
+  // load .symtab only once
+  xdl_ensure_symtab_loaded(self);
+  if (NULL == self->symtab) return;
+
+  // iterate symbols
+  for (size_t i = 0; i < self->symtab_cnt; i++) {
+    ElfW(Sym) *sym = self->symtab + i;
+    if (0 != xdl_iterate_sym_callback(self, sym, true, callback, data)) return;
+  }
 }

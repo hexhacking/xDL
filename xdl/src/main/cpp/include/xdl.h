@@ -65,9 +65,25 @@ typedef struct {
 void *xdl_open(const char *filename, int flags);
 void *xdl_open2(struct dl_phdr_info *info);
 void *xdl_close(void *handle);
-void xdl_preload(void *handle);
 void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size);
 void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size);
+
+//
+// preload .dynsym and .symtab for current handle
+//
+void xdl_preload(void *handle);
+
+//
+// symbol iterator
+//
+void xdl_iterate_sym(void *handle,
+                     int (*callback)(void *addr, const char *symbol, size_t symbol_size, unsigned char type,
+                                     unsigned char bind, unsigned char visibility, void *data),
+                     void *data);
+void xdl_iterate_dsym(void *handle,
+                      int (*callback)(void *addr, const char *symbol, size_t symbol_size, unsigned char type,
+                                      unsigned char bind, unsigned char visibility, void *data),
+                      void *data);
 
 //
 // Enhanced dladdr().

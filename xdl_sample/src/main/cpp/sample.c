@@ -166,6 +166,34 @@ static void sample_test_cache_queue(void) {
   xdl_dump();
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+static int sample_test_iterate_sym_cb(void *addr, const char *symbol, size_t symbol_size, unsigned char type,
+                                      unsigned char bind, unsigned char visibility, void *data) {
+  //  LOG("0x%p %s, size %zu, type %hhu， bind %hhu, vis %hhu, data 0x%p",
+  //      addr, symbol, symbol_size, type, bind, visibility, data);
+  (*(size_t *)data)++;
+  //  if ((*(size_t *)data) > 100) return 1;
+  return 0;
+}
+#pragma clang diagnostic pop
+
+static void sample_test_iterate_sym(void) {
+  void *handle = xdl_open("libc.so", XDL_DEFAULT);
+
+  size_t cnt = 0;
+  LOG("iterate .dynsym:");
+  xdl_iterate_sym(handle, sample_test_iterate_sym_cb, (void *)&cnt);
+  LOG(".dynsym: count %zu", cnt);
+
+  cnt = 0;
+  LOG("iterate .symtab:");
+  xdl_iterate_dsym(handle, sample_test_iterate_sym_cb, (void *)&cnt);
+  LOG(".symtab: count %zu", cnt);
+
+  xdl_close(handle);
+}
+
 static void sample_test(JNIEnv *env, jobject thiz) {
   (void)env;
   (void)thiz;
@@ -229,6 +257,7 @@ static void sample_test(JNIEnv *env, jobject thiz) {
   }
 
   sample_test_cache_queue();
+  sample_test_iterate_sym();
 }
 
 static JNINativeMethod sample_jni_methods[] = {{"nativeTest", "()V", (void *)sample_test}};
