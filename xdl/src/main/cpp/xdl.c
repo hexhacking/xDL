@@ -41,6 +41,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "queue.h"
 #include "xdl_iterate.h"
 #include "xdl_linker.h"
 #include "xdl_lzma.h"
@@ -71,28 +72,21 @@ typedef struct xdl {
   const ElfW(Phdr) *dlpi_phdr;
   ElfW(Half) dlpi_phnum;
 
-  struct xdl *next;     // to next xdl obj for cache in xdl_addr()
-  void *linker_handle;  // hold handle returned by xdl_linker_force_dlopen()
+  // hold handle returned by xdl_linker_force_dlopen()
+  void *linker_handle;
 
-  //
-  // (1) for searching symbols from .dynsym
-  //
-
+  // for searching symbols from .dynsym
   bool dynsym_loaded;
   pthread_mutex_t dynsym_load_lock;
   ElfW(Sym) *dynsym;   // .dynsym, also used to confirm whether .dynsym has been loaded successfully
   const char *dynstr;  // .dynstr
   size_t dynstr_sz;    // .dynstr size
-
-  // .hash (SYSV hash for .dynstr)
   struct {
     const uint32_t *buckets;
     uint32_t buckets_cnt;
     const uint32_t *chains;
     uint32_t chains_cnt;
-  } sysv_hash;
-
-  // .gnu.hash (GNU hash for .dynstr)
+  } sysv_hash;  // .hash (SYSV hash for .dynstr)
   struct {
     const uint32_t *buckets;
     uint32_t buckets_cnt;
@@ -101,12 +95,9 @@ typedef struct xdl {
     const ElfW(Addr) *bloom;
     uint32_t bloom_cnt;
     uint32_t bloom_shift;
-  } gnu_hash;
+  } gnu_hash;  // .gnu.hash (GNU hash for .dynstr)
 
-  //
-  // (2) for searching symbols from .symtab
-  //
-
+  // for searching symbols from .symtab
   bool symtab_loaded;
   pthread_mutex_t symtab_load_lock;
   uintptr_t base;
@@ -114,12 +105,159 @@ typedef struct xdl {
   size_t symtab_cnt;  // .symtab count
   char *strtab;       // .strtab
   size_t strtab_sz;   // .strtab size
+
+  uintptr_t handle;
+  size_t ref_count;
+  TAILQ_ENTRY(xdl, ) link;
 } xdl_t;
+typedef TAILQ_HEAD(xdl_queue, xdl, ) xdl_queue_t;
+
+// global xdl object queue
+static xdl_queue_t xdls = TAILQ_HEAD_INITIALIZER(xdls);
+static pthread_mutex_t xdls_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #pragma clang diagnostic pop
 
-static ElfW(Sym) *xdl_sym_by_addr(void *handle, void *addr);
-static ElfW(Sym) *xdl_dsym_by_addr(void *handle, void *addr);
+static ElfW(Sym) *xdl_sym_by_addr(xdl_t *self, void *addr);
+static ElfW(Sym) *xdl_dsym_by_addr(xdl_t *self, void *addr);
+
+static bool xdl_elf_is_match_by_addr(uintptr_t load_bias, const ElfW(Phdr) *dlpi_phdr, ElfW(Half) dlpi_phnum,
+                                     uintptr_t addr) {
+  if (addr < load_bias) return false;
+
+  uintptr_t vaddr = addr - load_bias;
+  for (size_t i = 0; i < dlpi_phnum; i++) {
+    const ElfW(Phdr) *phdr = &(dlpi_phdr[i]);
+    if (PT_LOAD != phdr->p_type) continue;
+
+    if (phdr->p_vaddr <= vaddr && vaddr < phdr->p_vaddr + phdr->p_memsz) return true;
+  }
+
+  return false;
+}
+
+static xdl_t *xdl_create(const char *pathname, uintptr_t load_bias, const ElfW(Phdr) *dlpi_phdr,
+                         ElfW(Half) dlpi_phnum) {
+  xdl_t *self = calloc(1, sizeof(xdl_t));
+  if (NULL == self) return NULL;
+
+  self->pathname = strdup(pathname);
+  if (NULL == self->pathname) {
+    free(self);
+    return NULL;
+  }
+  self->load_bias = load_bias;
+  self->dlpi_phdr = dlpi_phdr;
+  self->dlpi_phnum = dlpi_phnum;
+  self->dynsym_loaded = false;
+  pthread_mutex_init(&self->dynsym_load_lock, NULL);
+  self->symtab_loaded = false;
+  pthread_mutex_init(&self->symtab_load_lock, NULL);
+  self->ref_count = 0;
+
+  return self;
+}
+
+static void xdl_destroy(xdl_t *self) {
+  if (NULL != self->pathname) free(self->pathname);
+  if (NULL != self->symtab) free(self->symtab);
+  if (NULL != self->strtab) free(self->strtab);
+  pthread_mutex_destroy(&self->dynsym_load_lock);
+  pthread_mutex_destroy(&self->symtab_load_lock);
+  free(self);
+}
+
+static uintptr_t xdl_generate_handle(void) {
+  uintptr_t handle;
+  while (true) {
+    arc4random_buf(&handle, sizeof(handle));
+    if (0 == handle) continue;
+    xdl_t *xdl;
+    TAILQ_FOREACH(xdl, &xdls, link) {
+      if (xdl->handle == handle) break;
+    }
+    if (NULL == xdl) break;
+  }
+  return handle;
+}
+
+static xdl_t *xdl_queue_find(void *handle) {
+  xdl_t *self;
+  pthread_mutex_lock(&xdls_lock);
+  TAILQ_FOREACH(self, &xdls, link) {
+    if (self->handle == (uintptr_t)handle) break;
+  }
+  pthread_mutex_unlock(&xdls_lock);
+  return self;
+}
+
+static xdl_t *xdl_queue_find_by_filename_and_increment_ref_count(const char *filename) {
+  xdl_t *self;
+  pthread_mutex_lock(&xdls_lock);
+  TAILQ_FOREACH(self, &xdls, link) {
+    if (xdl_util_match_pathname(self->pathname, filename)) {
+      self->ref_count++;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&xdls_lock);
+  return self;
+}
+
+static xdl_t *xdl_queue_find_by_addr_and_increment_ref_count(void *addr) {
+  xdl_t *self;
+  pthread_mutex_lock(&xdls_lock);
+  TAILQ_FOREACH(self, &xdls, link) {
+    if (xdl_elf_is_match_by_addr(self->load_bias, self->dlpi_phdr, self->dlpi_phnum, (uintptr_t)addr)) {
+      self->ref_count++;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&xdls_lock);
+  return self;
+}
+
+static xdl_t *xdl_queue_find_and_decrement_ref_count(void *handle) {
+  xdl_t *self;
+  pthread_mutex_lock(&xdls_lock);
+  TAILQ_FOREACH(self, &xdls, link) {
+    if (self->handle == (uintptr_t)handle) break;
+  }
+  if (NULL != self) {
+    self->ref_count--;
+    if (0 == self->ref_count) {
+      TAILQ_REMOVE(&xdls, self, link);
+    } else {
+      self = NULL;
+    }
+  }
+  pthread_mutex_unlock(&xdls_lock);
+  return self;
+}
+
+static xdl_t *xdl_queue_add_new(xdl_t *self) {
+  xdl_t *tmp;
+  pthread_mutex_lock(&xdls_lock);
+  TAILQ_FOREACH(tmp, &xdls, link) {
+    if (xdl_util_match_pathname(tmp->pathname, self->pathname)) {
+      tmp->ref_count++;
+      break;
+    }
+  }
+  if (NULL == tmp) {
+    self->handle = xdl_generate_handle();
+    self->ref_count = 1;
+    TAILQ_INSERT_TAIL(&xdls, self, link);
+  }
+  pthread_mutex_unlock(&xdls_lock);
+
+  if (NULL == tmp) {
+    return self;
+  } else {
+    xdl_destroy(self);
+    return tmp;
+  }
+}
 
 // load from memory
 static void xdl_dynsym_load(xdl_t *self) {
@@ -418,7 +556,7 @@ static uintptr_t xdl_get_base_from_phdr(uintptr_t phdr) {
   return base;
 }
 
-static xdl_t *xdl_find_from_auxv(unsigned long type, const char *pathname) {
+static xdl_t *xdl_find_in_auxv(unsigned long type, const char *pathname) {
   if (NULL == getauxval) return NULL;  // API level < 18
 
   uintptr_t val = (uintptr_t)getauxval(type);
@@ -444,21 +582,7 @@ static xdl_t *xdl_find_from_auxv(unsigned long type, const char *pathname) {
   if (UINTPTR_MAX == min_vaddr || base < min_vaddr) return NULL;
   uintptr_t load_bias = base - min_vaddr;
 
-  // create xDL object
-  xdl_t *self;
-  if (NULL == (self = calloc(1, sizeof(xdl_t)))) return NULL;
-  if (NULL == (self->pathname = strdup(pathname))) {
-    free(self);
-    return NULL;
-  }
-  self->load_bias = load_bias;
-  self->dlpi_phdr = dlpi_phdr;
-  self->dlpi_phnum = dlpi_phnum;
-  self->dynsym_loaded = false;
-  pthread_mutex_init(&self->dynsym_load_lock, NULL);
-  self->symtab_loaded = false;
-  pthread_mutex_init(&self->symtab_load_lock, NULL);
-  return self;
+  return xdl_create(pathname, load_bias, dlpi_phdr, dlpi_phnum);
 }
 
 static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg) {
@@ -472,70 +596,50 @@ static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg
   if (0 == info->dlpi_addr || NULL == info->dlpi_name) return 0;
 
   // check pathname
-  if ('[' == filename[0]) {
-    if (0 != strcmp(info->dlpi_name, filename)) return 0;
-  } else if ('/' == filename[0]) {
-    if ('/' == info->dlpi_name[0]) {
-      if (0 != strcmp(info->dlpi_name, filename)) return 0;
-    } else {
-      if (!xdl_util_ends_with(filename, info->dlpi_name)) return 0;
-    }
-  } else {
-    if ('/' == info->dlpi_name[0]) {
-      if (!xdl_util_ends_with(info->dlpi_name, filename)) return 0;
-    } else {
-      if (0 != strcmp(info->dlpi_name, filename)) return 0;
-    }
-  }
+  if (!xdl_util_match_pathname(info->dlpi_name, filename)) return 0;
 
   // found the target ELF
-  if (NULL == ((*self) = calloc(1, sizeof(xdl_t)))) return 1;  // return failed
-  if (NULL == ((*self)->pathname = strdup((const char *)info->dlpi_name))) {
-    free(*self);
-    *self = NULL;
-    return 1;  // return failed
-  }
-  (*self)->load_bias = info->dlpi_addr;
-  (*self)->dlpi_phdr = info->dlpi_phdr;
-  (*self)->dlpi_phnum = info->dlpi_phnum;
-  (*self)->dynsym_loaded = false;
-  pthread_mutex_init(&(*self)->dynsym_load_lock, NULL);
-  (*self)->symtab_loaded = false;
-  pthread_mutex_init(&(*self)->symtab_load_lock, NULL);
-  return 1;  // return OK
+  *self = xdl_create(info->dlpi_name, info->dlpi_addr, info->dlpi_phdr, info->dlpi_phnum);
+  return 1;  // finished
 }
 
 static xdl_t *xdl_find(const char *filename) {
-  // from auxv (linker, vDSO)
-  xdl_t *self = NULL;
-  if (xdl_util_ends_with(filename, XDL_UTIL_LINKER_BASENAME))
-    self = xdl_find_from_auxv(AT_BASE, XDL_UTIL_LINKER_PATHNAME);
-  else if (xdl_util_ends_with(filename, XDL_UTIL_VDSO_BASENAME))
-    self = xdl_find_from_auxv(AT_SYSINFO_EHDR, XDL_UTIL_VDSO_BASENAME);
-
-  // from auxv (app_process)
-  const char *basename, *pathname;
+  const char *app_process_basename, *app_process_pathname;
 #if (defined(__arm__) || defined(__i386__)) && __ANDROID_API__ < __ANDROID_API_L__
   if (xdl_util_get_api_level() < __ANDROID_API_L__) {
-    basename = XDL_UTIL_APP_PROCESS_BASENAME_K;
-    pathname = XDL_UTIL_APP_PROCESS_PATHNAME_K;
+    app_process_basename = XDL_UTIL_APP_PROCESS_BASENAME_K;
+    app_process_pathname = XDL_UTIL_APP_PROCESS_PATHNAME_K;
   } else
 #endif
   {
-    basename = XDL_UTIL_APP_PROCESS_BASENAME;
-    pathname = XDL_UTIL_APP_PROCESS_PATHNAME;
+    app_process_basename = XDL_UTIL_APP_PROCESS_BASENAME;
+    app_process_pathname = XDL_UTIL_APP_PROCESS_PATHNAME;
   }
-  if (xdl_util_ends_with(filename, basename)) self = xdl_find_from_auxv(AT_PHDR, pathname);
 
+  // from xDL's global queue
+  xdl_t *self = xdl_queue_find_by_filename_and_increment_ref_count(filename);
   if (NULL != self) return self;
 
-  // from dl_iterate_phdr
-  uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)filename};
-  xdl_iterate_phdr(xdl_find_iterate_cb, pkg, XDL_DEFAULT);
-  return self;
+  if (xdl_util_ends_with(filename, XDL_UTIL_LINKER_BASENAME)) {
+    // from auxv (for linker)
+    self = xdl_find_in_auxv(AT_BASE, XDL_UTIL_LINKER_PATHNAME);
+  } else if (xdl_util_ends_with(filename, XDL_UTIL_VDSO_BASENAME)) {
+    // from auxv (for vDSO)
+    self = xdl_find_in_auxv(AT_SYSINFO_EHDR, XDL_UTIL_VDSO_BASENAME);
+  } else if (xdl_util_ends_with(filename, app_process_basename)) {
+    // from auxv (for app_process)
+    self = xdl_find_in_auxv(AT_PHDR, app_process_pathname);
+  } else {
+    // from dl_iterate_phdr()
+    uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)filename};
+    xdl_iterate_phdr(xdl_find_iterate_cb, pkg, XDL_DEFAULT);
+  }
+  if (NULL != self) return xdl_queue_add_new(self);
+
+  return NULL;
 }
 
-static void *xdl_open_always_force(const char *filename) {
+static xdl_t *xdl_open_always_force(const char *filename) {
   // always force dlopen()
   void *linker_handle = xdl_linker_force_dlopen(filename);
   if (NULL == linker_handle) return NULL;
@@ -547,13 +651,13 @@ static void *xdl_open_always_force(const char *filename) {
   else
     self->linker_handle = linker_handle;
 
-  return (void *)self;
+  return self;
 }
 
-static void *xdl_open_try_force(const char *filename) {
+static xdl_t *xdl_open_try_force(const char *filename) {
   // find
   xdl_t *self = xdl_find(filename);
-  if (NULL != self) return (void *)self;
+  if (NULL != self) return self;
 
   // try force dlopen()
   return xdl_open_always_force(filename);
@@ -562,46 +666,76 @@ static void *xdl_open_try_force(const char *filename) {
 void *xdl_open(const char *filename, int flags) {
   if (NULL == filename) return NULL;
 
-  if (flags & XDL_ALWAYS_FORCE_LOAD)
-    return xdl_open_always_force(filename);
-  else if (flags & XDL_TRY_FORCE_LOAD)
-    return xdl_open_try_force(filename);
-  else
-    return xdl_find(filename);
+  xdl_t *self;
+  if (flags & XDL_ALWAYS_FORCE_LOAD) {
+    self = xdl_open_always_force(filename);
+  } else if (flags & XDL_TRY_FORCE_LOAD) {
+    self = xdl_open_try_force(filename);
+  } else {
+    self = xdl_find(filename);
+  }
+
+  return NULL == self ? NULL : (void *)self->handle;
 }
 
 void *xdl_open2(struct dl_phdr_info *info) {
   if (NULL == info) return NULL;
 
-  xdl_t *self = calloc(1, sizeof(xdl_t));
-  if (NULL == self) return NULL;
-  if (NULL == (self->pathname = strdup((const char *)info->dlpi_name))) {
-    free(self);
-    return NULL;
+  // from xDL's global queue
+  xdl_t *self = xdl_queue_find_by_filename_and_increment_ref_count(info->dlpi_name);
+  if (NULL != self) return (void *)self->handle;
+
+  // from provided info
+  self = xdl_create(info->dlpi_name, info->dlpi_addr, info->dlpi_phdr, info->dlpi_phnum);
+  if (NULL != self) {
+    self = xdl_queue_add_new(self);
+    return (void *)self->handle;
   }
-  self->load_bias = info->dlpi_addr;
-  self->dlpi_phdr = info->dlpi_phdr;
-  self->dlpi_phnum = info->dlpi_phnum;
-  self->dynsym_loaded = false;
-  pthread_mutex_init(&self->dynsym_load_lock, NULL);
-  self->symtab_loaded = false;
-  pthread_mutex_init(&self->symtab_load_lock, NULL);
-  return self;
+
+  return NULL;
 }
 
 void *xdl_close(void *handle) {
   if (NULL == handle) return NULL;
 
-  xdl_t *self = (xdl_t *)handle;
-  if (NULL != self->pathname) free(self->pathname);
-  if (NULL != self->symtab) free(self->symtab);
-  if (NULL != self->strtab) free(self->strtab);
-  pthread_mutex_destroy(&self->dynsym_load_lock);
-  pthread_mutex_destroy(&self->symtab_load_lock);
+  xdl_t *self = xdl_queue_find_and_decrement_ref_count(handle);
+  if (NULL == self) return NULL;
 
   void *linker_handle = self->linker_handle;
-  free(self);
+  xdl_destroy(self);
   return linker_handle;
+}
+
+static void xdl_ensure_dynsym_loaded(xdl_t *self) {
+  if (!__atomic_load_n(&self->dynsym_loaded, __ATOMIC_ACQUIRE)) {
+    pthread_mutex_lock(&self->dynsym_load_lock);
+    if (!__atomic_load_n(&self->dynsym_loaded, __ATOMIC_RELAXED)) {
+      xdl_dynsym_load(self);
+      __atomic_store_n(&self->dynsym_loaded, true, __ATOMIC_RELEASE);
+    }
+    pthread_mutex_unlock(&self->dynsym_load_lock);
+  }
+}
+
+static void xdl_ensure_symtab_loaded(xdl_t *self) {
+  if (!__atomic_load_n(&self->symtab_loaded, __ATOMIC_ACQUIRE)) {
+    pthread_mutex_lock(&self->symtab_load_lock);
+    if (!__atomic_load_n(&self->symtab_loaded, __ATOMIC_RELAXED)) {
+      xdl_symtab_load(self);
+      __atomic_store_n(&self->symtab_loaded, true, __ATOMIC_RELEASE);
+    }
+    pthread_mutex_unlock(&self->symtab_load_lock);
+  }
+}
+
+void xdl_preload(void *handle) {
+  if (NULL == handle) return;
+
+  xdl_t *self = xdl_queue_find(handle);
+  if (NULL == self) return;
+
+  xdl_ensure_dynsym_loaded(self);
+  xdl_ensure_symtab_loaded(self);
 }
 
 static uint32_t xdl_sysv_hash(const uint8_t *name) {
@@ -735,33 +869,12 @@ static void *xdl_resolve_symbol_address(xdl_t *self, ElfW(Sym) *sym, size_t *sym
   }
 }
 
-static void xdl_ensure_dynsym_loaded(xdl_t *self) {
-  if (!__atomic_load_n(&self->dynsym_loaded, __ATOMIC_ACQUIRE)) {
-    pthread_mutex_lock(&self->dynsym_load_lock);
-    if (!__atomic_load_n(&self->dynsym_loaded, __ATOMIC_RELAXED)) {
-      xdl_dynsym_load(self);
-      __atomic_store_n(&self->dynsym_loaded, true, __ATOMIC_RELEASE);
-    }
-    pthread_mutex_unlock(&self->dynsym_load_lock);
-  }
-}
-
-static void xdl_ensure_symtab_loaded(xdl_t *self) {
-  if (!__atomic_load_n(&self->symtab_loaded, __ATOMIC_ACQUIRE)) {
-    pthread_mutex_lock(&self->symtab_load_lock);
-    if (!__atomic_load_n(&self->symtab_loaded, __ATOMIC_RELAXED)) {
-      xdl_symtab_load(self);
-      __atomic_store_n(&self->symtab_loaded, true, __ATOMIC_RELEASE);
-    }
-    pthread_mutex_unlock(&self->symtab_load_lock);
-  }
-}
-
 void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size) {
   if (NULL == handle || NULL == symbol) return NULL;
   if (NULL != symbol_size) *symbol_size = 0;
 
-  xdl_t *self = (xdl_t *)handle;
+  xdl_t *self = xdl_queue_find(handle);
+  if (NULL == self) return NULL;
 
   // load .dynsym only once
   xdl_ensure_dynsym_loaded(self);
@@ -829,7 +942,8 @@ void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size) {
   if (NULL == handle || NULL == symbol) return NULL;
   if (NULL != symbol_size) *symbol_size = 0;
 
-  xdl_t *self = (xdl_t *)handle;
+  xdl_t *self = xdl_queue_find(handle);
+  if (NULL == self) return NULL;
 
   // load .symtab only once
   xdl_ensure_symtab_loaded(self);
@@ -850,21 +964,6 @@ void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size) {
   return NULL;
 }
 
-static bool xdl_elf_is_match(uintptr_t load_bias, const ElfW(Phdr) *dlpi_phdr, ElfW(Half) dlpi_phnum,
-                             uintptr_t addr) {
-  if (addr < load_bias) return false;
-
-  uintptr_t vaddr = addr - load_bias;
-  for (size_t i = 0; i < dlpi_phnum; i++) {
-    const ElfW(Phdr) *phdr = &(dlpi_phdr[i]);
-    if (PT_LOAD != phdr->p_type) continue;
-
-    if (phdr->p_vaddr <= vaddr && vaddr < phdr->p_vaddr + phdr->p_memsz) return true;
-  }
-
-  return false;
-}
-
 static int xdl_open_by_addr_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg) {
   (void)size;
 
@@ -872,37 +971,28 @@ static int xdl_open_by_addr_iterate_cb(struct dl_phdr_info *info, size_t size, v
   xdl_t **self = (xdl_t **)*pkg++;
   uintptr_t addr = *pkg;
 
-  if (0 == info->dlpi_addr || NULL == info->dlpi_name) return 0;  // continue
-
-  if (xdl_elf_is_match(info->dlpi_addr, info->dlpi_phdr, info->dlpi_phnum, addr)) {
-    // found the target ELF
-    if (NULL == ((*self) = calloc(1, sizeof(xdl_t)))) return 1;  // failed
-    if (NULL == ((*self)->pathname = strdup((const char *)info->dlpi_name))) {
-      free(*self);
-      *self = NULL;
-      return 1;  // failed
-    }
-    (*self)->load_bias = info->dlpi_addr;
-    (*self)->dlpi_phdr = info->dlpi_phdr;
-    (*self)->dlpi_phnum = info->dlpi_phnum;
-    (*self)->dynsym_loaded = false;
-    pthread_mutex_init(&(*self)->dynsym_load_lock, NULL);
-    (*self)->symtab_loaded = false;
-    pthread_mutex_init(&(*self)->symtab_load_lock, NULL);
-    return 1;  // OK
+  if (0 != info->dlpi_addr && NULL != info->dlpi_name &&
+      xdl_elf_is_match_by_addr(info->dlpi_addr, info->dlpi_phdr, info->dlpi_phnum, addr)) {
+    *self = xdl_create(info->dlpi_name, info->dlpi_addr, info->dlpi_phdr, info->dlpi_phnum);
+    return 1;  // finished
   }
 
   return 0;  // continue
 }
 
-static void *xdl_open_by_addr(void *addr) {
+static xdl_t *xdl_open_by_addr(void *addr) {
   if (NULL == addr) return NULL;
 
-  xdl_t *self = NULL;
+  // from xDL's global queue
+  xdl_t *self = xdl_queue_find_by_addr_and_increment_ref_count(addr);
+  if (NULL != self) return self;
+
+  // from dl_iterate_phdr()
   uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)addr};
   xdl_iterate_phdr(xdl_open_by_addr_iterate_cb, pkg, XDL_DEFAULT);
+  if (NULL != self) return xdl_queue_add_new(self);
 
-  return (void *)self;
+  return NULL;
 }
 
 static bool xdl_sym_is_match(ElfW(Sym) *sym, uintptr_t offset, bool is_symtab) {
@@ -926,9 +1016,7 @@ static bool xdl_sym_is_match(ElfW(Sym) *sym, uintptr_t offset, bool is_symtab) {
   return offset >= sym_st_value_fixed && offset < sym_st_value_fixed + sym->st_size;
 }
 
-static ElfW(Sym) *xdl_sym_by_addr(void *handle, void *addr) {
-  xdl_t *self = (xdl_t *)handle;
-
+static ElfW(Sym) *xdl_sym_by_addr(xdl_t *self, void *addr) {
   // load .dynsym only once
   xdl_ensure_dynsym_loaded(self);
   if (NULL == self->dynsym) return NULL;
@@ -955,9 +1043,7 @@ static ElfW(Sym) *xdl_sym_by_addr(void *handle, void *addr) {
   return NULL;
 }
 
-static ElfW(Sym) *xdl_dsym_by_addr(void *handle, void *addr) {
-  xdl_t *self = (xdl_t *)handle;
-
+static ElfW(Sym) *xdl_dsym_by_addr(xdl_t *self, void *addr) {
   // load .symtab only once
   xdl_ensure_symtab_loaded(self);
   if (NULL == self->symtab) return NULL;
@@ -972,6 +1058,11 @@ static ElfW(Sym) *xdl_dsym_by_addr(void *handle, void *addr) {
   return NULL;
 }
 
+typedef struct xdl_node {
+  struct xdl *obj;
+  struct xdl_node *next;
+} xdl_node_t;
+
 int xdl_addr(void *addr, xdl_info_t *info, void **cache) {
   return xdl_addr4(addr, info, cache, XDL_DEFAULT);
 }
@@ -981,44 +1072,57 @@ int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags) {
 
   memset(info, 0, sizeof(xdl_info_t));
 
-  // find handle from cache
-  xdl_t *handle = NULL;
-  for (handle = *((xdl_t **)cache); NULL != handle; handle = handle->next)
-    if (xdl_elf_is_match(handle->load_bias, handle->dlpi_phdr, handle->dlpi_phnum, (uintptr_t)addr)) break;
+  // from local cache
+  xdl_t *self = NULL;
+  for (xdl_node_t *node = *((xdl_node_t **)cache); NULL != node; node = node->next) {
+    if (xdl_elf_is_match_by_addr(node->obj->load_bias, node->obj->dlpi_phdr, node->obj->dlpi_phnum,
+                                 (uintptr_t)addr)) {
+      self = node->obj;
+      break;
+    }
+  }
 
-  // create new handle, save handle to cache
-  if (NULL == handle) {
-    handle = (xdl_t *)xdl_open_by_addr(addr);
-    if (NULL == handle) return 0;
-    handle->next = *(xdl_t **)cache;
-    *(xdl_t **)cache = handle;
+  if (NULL == self) {
+    // from xDL's global queue or create new object
+    self = xdl_open_by_addr(addr);
+    if (NULL == self) return 0;
+
+    // save to cache
+    xdl_node_t *node = malloc(sizeof(xdl_node_t));
+    if (NULL == node) {
+      xdl_close((void *)self->handle);
+      return 0;
+    }
+    node->obj = self;
+    node->next = *(xdl_node_t **)cache;
+    *(xdl_node_t **)cache = node;
   }
 
   // we have at least: load_bias, pathname, dlpi_phdr, dlpi_phnum
-  info->dli_fbase = (void *)handle->load_bias;
-  info->dli_fname = handle->pathname;
+  info->dli_fbase = (void *)self->load_bias;
+  info->dli_fname = self->pathname;
   info->dli_sname = NULL;
   info->dli_saddr = 0;
   info->dli_ssize = 0;
-  info->dlpi_phdr = handle->dlpi_phdr;
-  info->dlpi_phnum = (size_t)handle->dlpi_phnum;
+  info->dlpi_phdr = self->dlpi_phdr;
+  info->dlpi_phnum = (size_t)self->dlpi_phnum;
 
   // keep looking for: symbol name, symbol offset, symbol size
   if (!(flags & XDL_NON_SYM)) {
     ElfW(Sym) *sym;
-    if (NULL != (sym = xdl_sym_by_addr((void *)handle, addr))) {
-      if (sym->st_name < handle->dynstr_sz)
-        info->dli_sname = handle->dynstr + sym->st_name;
+    if (NULL != (sym = xdl_sym_by_addr(self, addr))) {
+      if (sym->st_name < self->dynstr_sz)
+        info->dli_sname = self->dynstr + sym->st_name;
       else
         info->dli_sname = "dynstr_out_of_bounds_error";
-      info->dli_saddr = (void *)(handle->load_bias + sym->st_value);
+      info->dli_saddr = (void *)(self->load_bias + sym->st_value);
       info->dli_ssize = sym->st_size;
-    } else if (NULL != (sym = xdl_dsym_by_addr((void *)handle, addr))) {
-      if (sym->st_name < handle->strtab_sz)
-        info->dli_sname = handle->strtab + sym->st_name;
+    } else if (NULL != (sym = xdl_dsym_by_addr(self, addr))) {
+      if (sym->st_name < self->strtab_sz)
+        info->dli_sname = self->strtab + sym->st_name;
       else
         info->dli_sname = "strtab_out_of_bounds_error";
-      info->dli_saddr = (void *)(handle->load_bias + sym->st_value);
+      info->dli_saddr = (void *)(self->load_bias + sym->st_value);
       info->dli_ssize = sym->st_size;
     }
   }
@@ -1029,11 +1133,12 @@ int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags) {
 void xdl_addr_clean(void **cache) {
   if (NULL == cache) return;
 
-  xdl_t *handle = *((xdl_t **)cache);
-  while (NULL != handle) {
-    xdl_t *tmp = handle;
-    handle = handle->next;
-    xdl_close(tmp);
+  xdl_node_t *node = *((xdl_node_t **)cache);
+  while (NULL != node) {
+    xdl_node_t *tmp = node;
+    node = node->next;
+    xdl_close((void *)tmp->obj->handle);
+    free(tmp);
   }
   *cache = NULL;
 }
@@ -1047,9 +1152,10 @@ int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), voi
 int xdl_info(void *handle, int request, void *info) {
   if (NULL == handle || XDL_DI_DLINFO != request || NULL == info) return -1;
 
-  xdl_t *self = (xdl_t *)handle;
-  xdl_info_t *dlinfo = (xdl_info_t *)info;
+  xdl_t *self = xdl_queue_find(handle);
+  if (NULL == self) return -1;
 
+  xdl_info_t *dlinfo = (xdl_info_t *)info;
   dlinfo->dli_fbase = (void *)self->load_bias;
   dlinfo->dli_fname = self->pathname;
   dlinfo->dli_sname = NULL;
@@ -1058,4 +1164,14 @@ int xdl_info(void *handle, int request, void *info) {
   dlinfo->dlpi_phdr = self->dlpi_phdr;
   dlinfo->dlpi_phnum = (size_t)self->dlpi_phnum;
   return 0;
+}
+
+void xdl_dump(void) {
+  pthread_mutex_lock(&xdls_lock);
+  xdl_t *self;
+  TAILQ_FOREACH(self, &xdls, link) {
+    LOG("xdl cache-queue: %s, load_bias 0x%" PRIxPTR ", handle 0x%" PRIxPTR ", ref_count %zu", self->pathname,
+        self->load_bias, self->handle, self->ref_count);
+  }
+  pthread_mutex_unlock(&xdls_lock);
 }

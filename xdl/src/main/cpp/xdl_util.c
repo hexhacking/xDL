@@ -115,3 +115,15 @@ size_t xdl_util_get_pagesize(void) {
   }
   return val;
 }
+
+bool xdl_util_match_pathname(const char *a, const char *b) {
+  if ('/' == a[0] && '/' != b[0]) {
+    if (!xdl_util_ends_with(a, b)) return false;
+  } else if ('/' != a[0] && '/' == b[0]) {
+    if (!xdl_util_ends_with(b, a)) return false;
+  } else {
+    if (0 != strcmp(a, b)) return false;
+  }
+
+  return true;
+}

@@ -65,6 +65,7 @@ typedef struct {
 void *xdl_open(const char *filename, int flags);
 void *xdl_open2(struct dl_phdr_info *info);
 void *xdl_close(void *handle);
+void xdl_preload(void *handle);
 void *xdl_sym(void *handle, const char *symbol, size_t *symbol_size);
 void *xdl_dsym(void *handle, const char *symbol, size_t *symbol_size);
 
@@ -87,6 +88,11 @@ int xdl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *), voi
 //
 #define XDL_DI_DLINFO 1  // type of info: xdl_info_t
 int xdl_info(void *handle, int request, void *info);
+
+//
+// Dump debug information about the global cache queue to logcat (tag: xdl_tag).
+//
+void xdl_dump(void);
 
 #ifdef __cplusplus
 }

@@ -125,6 +125,47 @@ static void *sample_test_dlsym(const char *filename, const char *symbol, bool de
   return linker_handle;
 }
 
+static void sample_test_cache_queue(void) {
+  xdl_info_t xdlinfo;
+  struct dl_phdr_info dlinfo;
+  void *cache = NULL;
+
+  LOG("test_cache start...");
+  xdl_dump();
+
+  void *libc_handle = xdl_open("libc.so", XDL_DEFAULT);
+  void *malloc_addr = xdl_sym(libc_handle, "malloc", NULL);
+  xdl_addr(malloc_addr, &xdlinfo, &cache);
+  LOG("test_cache xdl_open + xdl_addr libc.so");
+  xdl_dump();
+  xdl_addr_clean(&cache);
+  LOG("test_cache xdl_open libc.so");
+  xdl_dump();
+
+  void *libart_handle = xdl_open("libart.so", XDL_DEFAULT);
+  LOG("test_cache xdl_open libart.so");
+  xdl_dump();
+
+  xdl_info(libart_handle, XDL_DI_DLINFO, (void *)&xdlinfo);
+  dlinfo.dlpi_addr = (ElfW(Addr))xdlinfo.dli_fbase;
+  dlinfo.dlpi_name = xdlinfo.dli_fname;
+  dlinfo.dlpi_phdr = xdlinfo.dlpi_phdr;
+  dlinfo.dlpi_phnum = (ElfW(Half))xdlinfo.dlpi_phnum;
+  void *libart_handle2 = xdl_open2(&dlinfo);
+  LOG("test_cache xdl_open2 libart.so");
+  xdl_dump();
+
+  xdl_close(libart_handle);
+  LOG("test_cache xdl_close libart_handle");
+  xdl_dump();
+  xdl_close(libart_handle2);
+  LOG("test_cache xdl_close libart_handle2");
+  xdl_dump();
+  xdl_close(libc_handle);
+  LOG("test_cache xdl_close libc_handle");
+  xdl_dump();
+}
+
 static void sample_test(JNIEnv *env, jobject thiz) {
   (void)env;
   (void)thiz;
@@ -186,6 +227,8 @@ static void sample_test(JNIEnv *env, jobject thiz) {
     LOG("--- dlclose(%s) : linker_handle %" PRIxPTR, BASENAME_LIBOPENCL, (uintptr_t)linker_handle_libOpenCL);
     dlclose(linker_handle_libOpenCL);
   }
+
+  sample_test_cache_queue();
 }
 
 static JNINativeMethod sample_jni_methods[] = {{"nativeTest", "()V", (void *)sample_test}};
