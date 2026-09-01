@@ -24,15 +24,9 @@
 #ifndef IO_GITHUB_HEXHACKING_XDL_UTIL
 #define IO_GITHUB_HEXHACKING_XDL_UTIL
 
-#include <android/log.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
-#define LOG(fmt, ...) __android_log_print(ANDROID_LOG_INFO, "xdl_tag", fmt, ##__VA_ARGS__)
-#pragma clang diagnostic pop
 
 #ifndef __LP64__
 #define XDL_UTIL_LINKER_BASENAME        "linker"

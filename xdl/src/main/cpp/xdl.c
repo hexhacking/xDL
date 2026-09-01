@@ -1170,16 +1170,6 @@ int xdl_info(void *handle, int request, void *info) {
   return 0;
 }
 
-void xdl_dump(void) {
-  pthread_mutex_lock(&xdls_lock);
-  xdl_t *self;
-  TAILQ_FOREACH(self, &xdls, link) {
-    LOG("xdl cache-queue: %s, load_bias 0x%" PRIxPTR ", handle 0x%" PRIxPTR ", ref_count %zu", self->pathname,
-        self->load_bias, self->handle, self->ref_count);
-  }
-  pthread_mutex_unlock(&xdls_lock);
-}
-
 static int xdl_iterate_sym_callback(xdl_t *self, ElfW(Sym) *sym, bool is_symtab,
                                     xdl_iterate_sym_callback_t callback, void *data) {
   const char *symbol;
@@ -1246,4 +1236,20 @@ void xdl_iterate_dsym(void *handle, xdl_iterate_sym_callback_t callback, void *d
     ElfW(Sym) *sym = self->symtab + i;
     if (0 != xdl_iterate_sym_callback(self, sym, true, callback, data)) return;
   }
+}
+
+void xdl_iterate_internal(int (*callback)(xdl_internal_t *, size_t, void *), void *data) {
+  pthread_mutex_lock(&xdls_lock);
+  xdl_t *self;
+  TAILQ_FOREACH(self, &xdls, link) {
+    xdl_internal_t info;
+    info.dlpi_addr = self->load_bias;
+    info.dlpi_name = self->pathname;
+    info.dlpi_phdr = self->dlpi_phdr;
+    info.dlpi_phnum = self->dlpi_phnum;
+    info.handle = self->handle;
+    info.ref_count = self->ref_count;
+    if (0 != callback(&info, sizeof(xdl_internal_t), data)) break;
+  }
+  pthread_mutex_unlock(&xdls_lock);
 }

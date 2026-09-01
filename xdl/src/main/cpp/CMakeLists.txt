@@ -6,7 +6,7 @@ add_library(xdl SHARED ${XDL_SRC})
 target_compile_features(xdl PUBLIC c_std_17)
 target_compile_options(xdl PUBLIC -std=c17 -Weverything -Werror)
 target_include_directories(xdl PUBLIC include .)
-target_link_libraries(xdl log)
+#target_link_libraries(xdl log)
 
 if(USEASAN)
     target_compile_options(xdl PUBLIC -fsanitize=address -fno-omit-frame-pointer)

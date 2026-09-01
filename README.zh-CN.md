@@ -286,4 +286,10 @@ int xdl_info(void *handle, int request, void *info);
 
 ## 许可证
 
-xDL 使用 [MIT 许可证](LICENSE)。
+xDL 使用 [MIT 许可证](LICENSE) 授权。
+
+xDL 使用了以下第三方源码或库：
+
+* [queue.h](xdl/src/main/cpp/queue.h)  
+  BSD 3-Clause License  
+  Copyright (c) 1991, 1993 The Regents of the University of California.

@@ -286,4 +286,10 @@ On success, `xdl_info()` returns `0`.  On failure, it returns `-1`.
 
 ## License
 
-xDL is MIT licensed, as found in the [LICENSE](LICENSE) file.
+xDL is licensed under the [MIT License](LICENSE).
+
+xDL uses the following third-party source code or libraries:
+
+* [queue.h](xdl/src/main/cpp/queue.h)  
+  BSD 3-Clause License  
+  Copyright (c) 1991, 1993 The Regents of the University of California.

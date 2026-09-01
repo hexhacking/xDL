@@ -125,26 +125,37 @@ static void *sample_test_dlsym(const char *filename, const char *symbol, bool de
   return linker_handle;
 }
 
+static int sample_dump_internal_callback(xdl_internal_t *info, size_t size, void *data) {
+  (void)size, (void)data;
+  LOG("xdl cache-queue: %s, load_bias 0x%" PRIxPTR ", handle 0x%" PRIxPTR ", ref_count %zu", info->dlpi_name,
+      info->dlpi_addr, info->handle, info->ref_count);
+  return 0;  // continue
+}
+
+static void sample_dump_internal(void) {
+  xdl_iterate_internal(sample_dump_internal_callback, NULL);
+}
+
 static void sample_test_cache_queue(void) {
   xdl_info_t xdlinfo;
   struct dl_phdr_info dlinfo;
   void *cache = NULL;
 
   LOG("test_cache start...");
-  xdl_dump();
+  sample_dump_internal();
 
   void *libc_handle = xdl_open("libc.so", XDL_DEFAULT);
   void *malloc_addr = xdl_sym(libc_handle, "malloc", NULL);
   xdl_addr(malloc_addr, &xdlinfo, &cache);
   LOG("test_cache xdl_open + xdl_addr libc.so");
-  xdl_dump();
+  sample_dump_internal();
   xdl_addr_clean(&cache);
   LOG("test_cache xdl_open libc.so");
-  xdl_dump();
+  sample_dump_internal();
 
   void *libart_handle = xdl_open("libart.so", XDL_DEFAULT);
   LOG("test_cache xdl_open libart.so");
-  xdl_dump();
+  sample_dump_internal();
 
   xdl_info(libart_handle, XDL_DI_DLINFO, (void *)&xdlinfo);
   dlinfo.dlpi_addr = (ElfW(Addr))xdlinfo.dli_fbase;
@@ -153,17 +164,17 @@ static void sample_test_cache_queue(void) {
   dlinfo.dlpi_phnum = (ElfW(Half))xdlinfo.dlpi_phnum;
   void *libart_handle2 = xdl_open2(&dlinfo);
   LOG("test_cache xdl_open2 libart.so");
-  xdl_dump();
+  sample_dump_internal();
 
   xdl_close(libart_handle);
   LOG("test_cache xdl_close libart_handle");
-  xdl_dump();
+  sample_dump_internal();
   xdl_close(libart_handle2);
   LOG("test_cache xdl_close libart_handle2");
-  xdl_dump();
+  sample_dump_internal();
   xdl_close(libc_handle);
   LOG("test_cache xdl_close libc_handle");
-  xdl_dump();
+  sample_dump_internal();
 }
 
 #pragma clang diagnostic push

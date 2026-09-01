@@ -12,7 +12,7 @@
         xdl_addr_clean;
         xdl_iterate_phdr;
         xdl_info;
-        xdl_dump;
+        xdl_iterate_internal;
 
     local:
         *;
