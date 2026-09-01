@@ -33,10 +33,10 @@ If xDL is compiled into an independent dynamic library:
 
 | ABI         | Compressed (KB) | Uncompressed (KB) |
 | :---------- |----------------:|------------------:|
-| armeabi-v7a |             8.3 |                15 |
-| arm64-v8a   |             9.1 |                20 |
-| x86         |             9.4 |                18 |
-| x86_64      |             9.3 |                20 |
+| armeabi-v7a |             9.8 |                17 |
+| arm64-v8a   |            10.8 |                24 |
+| x86         |            11.1 |                22 |
+| x86_64      |            11.3 |                24 |
 
 
 ## Usage
