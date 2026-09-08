@@ -140,7 +140,8 @@ static int xdl_iterate_by_linker_cb(struct dl_phdr_info *info, size_t size, void
 #if __ANDROID_API__ <= __ANDROID_API_M__
   // fix bug when android:extractNativeLibs="false" in Android 6.0
   char name_fixed[PATH_MAX];
-  if (xdl_util_get_api_level() == __ANDROID_API_M__ && xdl_util_ends_with(info->dlpi_name, ".apk")) {
+  if (xdl_util_get_api_level() == __ANDROID_API_M__ && 0 != info->dlpi_addr && NULL != info->dlpi_name &&
+      NULL != info->dlpi_phdr && info->dlpi_phnum > 0 && xdl_util_ends_with(info->dlpi_name, ".apk")) {
     // find .dynamic
     ElfW(Dyn) *dynamic = NULL;
     for (size_t i = 0; i < info->dlpi_phnum; i++) {

@@ -67,9 +67,19 @@
 
 extern __attribute((weak)) unsigned long int getauxval(unsigned long int);
 
+const char *xdl_version(void) {
+  return "xdl version " XDL_VERSION;
+}
+
+typedef struct xdl_ref {
+  void *handle;
+  void *caller;
+  TAILQ_ENTRY(xdl_ref, ) link;
+} xdl_ref_t;
+typedef TAILQ_HEAD(xdl_ref_queue, xdl_ref, ) xdl_ref_queue_t;
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wpadded"
-
 typedef struct xdl {
   char *pathname;
   uintptr_t load_bias;
@@ -110,17 +120,17 @@ typedef struct xdl {
   char *strtab;       // .strtab
   size_t strtab_sz;   // .strtab size
 
-  uintptr_t handle;
+  xdl_ref_queue_t ref_queue;
   size_t ref_count;
+
   TAILQ_ENTRY(xdl, ) link;
 } xdl_t;
+#pragma clang diagnostic pop
 typedef TAILQ_HEAD(xdl_queue, xdl, ) xdl_queue_t;
 
 // global xdl object queue
 static xdl_queue_t xdls = TAILQ_HEAD_INITIALIZER(xdls);
 static pthread_mutex_t xdls_lock = PTHREAD_MUTEX_INITIALIZER;
-
-#pragma clang diagnostic pop
 
 static ElfW(Sym) *xdl_sym_by_addr(xdl_t *self, void *addr);
 static ElfW(Sym) *xdl_dsym_by_addr(xdl_t *self, void *addr);
@@ -157,12 +167,15 @@ static xdl_t *xdl_create(const char *pathname, uintptr_t load_bias, const ElfW(P
   pthread_mutex_init(&self->dynsym_load_lock, NULL);
   self->symtab_loaded = false;
   pthread_mutex_init(&self->symtab_load_lock, NULL);
+  TAILQ_INIT(&self->ref_queue);
   self->ref_count = 0;
 
   return self;
 }
 
 static void xdl_destroy(xdl_t *self) {
+  if (0 != self->ref_count) abort();
+
   if (NULL != self->pathname) free(self->pathname);
   if (NULL != self->symtab) free(self->symtab);
   if (NULL != self->strtab) free(self->strtab);
@@ -173,73 +186,116 @@ static void xdl_destroy(xdl_t *self) {
 
 static uintptr_t xdl_generate_handle(void) {
   uintptr_t handle;
-  while (true) {
+
+  while (1) {
     arc4random_buf(&handle, sizeof(handle));
-    if (0 == handle) continue;
+    if (__predict_false(0 == handle)) continue;  // for xdl_open(), 0(NULL) indicates failure
+
+    // confirmed no duplicates
+    bool duplicate = false;
     xdl_t *xdl;
     TAILQ_FOREACH(xdl, &xdls, link) {
-      if (xdl->handle == handle) break;
+      xdl_ref_t *ref;
+      TAILQ_FOREACH(ref, &xdl->ref_queue, link) {
+        if (__predict_false(ref->handle == (void *)handle)) {
+          duplicate = true;
+          goto out;
+        }
+      }
     }
-    if (NULL == xdl) break;
+  out:
+    if (__predict_true(!duplicate)) break;
   }
+
   return handle;
+}
+
+static void *xdl_add_new_handle(xdl_t *self, void *caller) {
+  xdl_ref_t *ref = malloc(sizeof(xdl_ref_t));
+  if (NULL == ref) return 0;
+  ref->handle = (void *)(xdl_generate_handle());
+  ref->caller = caller;
+  TAILQ_INSERT_TAIL(&self->ref_queue, ref, link);
+  self->ref_count++;
+
+  return ref->handle;
 }
 
 static xdl_t *xdl_queue_find(void *handle) {
   xdl_t *self;
   pthread_mutex_lock(&xdls_lock);
   TAILQ_FOREACH(self, &xdls, link) {
-    if (self->handle == (uintptr_t)handle) break;
+    xdl_ref_t *ref;
+    TAILQ_FOREACH(ref, &self->ref_queue, link) {
+      if (ref->handle == handle) goto out;
+    }
   }
+out:
   pthread_mutex_unlock(&xdls_lock);
   return self;
 }
 
-static xdl_t *xdl_queue_find_by_filename_and_increment_ref_count(const char *filename) {
+static xdl_t *xdl_queue_find_by_filename_and_increment_ref_count(const char *filename, void *caller,
+                                                                 void **handle) {
+  *handle = NULL;
+
   xdl_t *self;
   pthread_mutex_lock(&xdls_lock);
   TAILQ_FOREACH(self, &xdls, link) {
     if (xdl_util_match_pathname(self->pathname, filename)) {
-      self->ref_count++;
+      *handle = xdl_add_new_handle(self, caller);
       break;
     }
   }
   pthread_mutex_unlock(&xdls_lock);
-  return self;
+
+  return NULL != *handle ? self : NULL;
 }
 
-static xdl_t *xdl_queue_find_by_addr_and_increment_ref_count(void *addr) {
+static xdl_t *xdl_queue_find_by_addr_and_increment_ref_count(void *addr, void *caller, void **handle) {
+  *handle = NULL;
+
   xdl_t *self;
   pthread_mutex_lock(&xdls_lock);
   TAILQ_FOREACH(self, &xdls, link) {
     if (xdl_elf_is_match_by_addr(self->load_bias, self->dlpi_phdr, self->dlpi_phnum, (uintptr_t)addr)) {
-      self->ref_count++;
+      *handle = xdl_add_new_handle(self, caller);
       break;
     }
   }
   pthread_mutex_unlock(&xdls_lock);
-  return self;
+
+  return NULL != *handle ? self : NULL;
 }
 
 static xdl_t *xdl_queue_find_and_decrement_ref_count(void *handle) {
   xdl_t *self;
   pthread_mutex_lock(&xdls_lock);
   TAILQ_FOREACH(self, &xdls, link) {
-    if (self->handle == (uintptr_t)handle) break;
-  }
-  if (NULL != self) {
-    self->ref_count--;
-    if (0 == self->ref_count) {
-      TAILQ_REMOVE(&xdls, self, link);
-    } else {
-      self = NULL;
+    xdl_ref_t *ref, *tmp;
+    TAILQ_FOREACH_SAFE(ref, &self->ref_queue, link, tmp) {
+      if (ref->handle == handle) {
+        // remove handle info
+        TAILQ_REMOVE(&self->ref_queue, ref, link);
+        free(ref);
+
+        self->ref_count--;
+        if (0 == self->ref_count) {
+          // remove xdl object
+          TAILQ_REMOVE(&xdls, self, link);
+        } else {
+          self = NULL;
+        }
+        goto out;
+      }
     }
   }
+out:
   pthread_mutex_unlock(&xdls_lock);
   return self;
 }
 
-static xdl_t *xdl_queue_add_new(xdl_t *self) {
+static xdl_t *xdl_queue_add_new(xdl_t *self, void *caller, void **handle) {
   xdl_t *tmp;
   pthread_mutex_lock(&xdls_lock);
   TAILQ_FOREACH(tmp, &xdls, link) {
@@ -249,17 +305,24 @@ static xdl_t *xdl_queue_add_new(xdl_t *self) {
     }
   }
   if (NULL == tmp) {
-    self->handle = xdl_generate_handle();
-    self->ref_count = 1;
-    TAILQ_INSERT_TAIL(&xdls, self, link);
+    *handle = xdl_add_new_handle(self, caller);
+    if (0 != *handle) {
+      TAILQ_INSERT_TAIL(&xdls, self, link);
+    }
+  } else {
+    *handle = xdl_add_new_handle(tmp, caller);
+    if (0 != *handle) {
+      xdl_destroy(self);
+      self = tmp;
+    }
   }
   pthread_mutex_unlock(&xdls_lock);
 
-  if (NULL == tmp) {
+  if (0 != *handle) {
     return self;
   } else {
     xdl_destroy(self);
-    return tmp;
+    return NULL;
   }
 }
 
@@ -607,7 +670,7 @@ static int xdl_find_iterate_cb(struct dl_phdr_info *info, size_t size, void *arg
   return 1;  // finished
 }
 
-static xdl_t *xdl_find(const char *filename) {
+static xdl_t *xdl_find(const char *filename, void *caller, void **handle) {
   const char *app_process_basename, *app_process_pathname;
 #if (defined(__arm__) || defined(__i386__)) && __ANDROID_API__ < __ANDROID_API_L__
   if (xdl_util_get_api_level() < __ANDROID_API_L__) {
@@ -621,9 +684,10 @@ static xdl_t *xdl_find(const char *filename) {
   }
 
   // from xDL's global queue
-  xdl_t *self = xdl_queue_find_by_filename_and_increment_ref_count(filename);
+  xdl_t *self = xdl_queue_find_by_filename_and_increment_ref_count(filename, caller, handle);
   if (NULL != self) return self;
 
+  // create new xDL object
   if (xdl_util_ends_with(filename, XDL_UTIL_LINKER_BASENAME)) {
     // from auxv (for linker)
     self = xdl_find_in_auxv(AT_BASE, XDL_UTIL_LINKER_PATHNAME);
@@ -638,18 +702,18 @@ static xdl_t *xdl_find(const char *filename) {
     uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)filename};
     xdl_iterate_phdr(xdl_find_iterate_cb, pkg, XDL_DEFAULT);
   }
-  if (NULL != self) return xdl_queue_add_new(self);
+  if (NULL != self) return xdl_queue_add_new(self, caller, handle);
 
   return NULL;
 }
 
-static xdl_t *xdl_open_always_force(const char *filename) {
+static xdl_t *xdl_open_always_force(const char *filename, void *caller, void **handle) {
   // always force dlopen()
   void *linker_handle = xdl_linker_force_dlopen(filename);
   if (NULL == linker_handle) return NULL;
 
   // find
-  xdl_t *self = xdl_find(filename);
+  xdl_t *self = xdl_find(filename, caller, handle);
   if (NULL == self)
     dlclose(linker_handle);
   else
@@ -658,42 +722,48 @@ static xdl_t *xdl_open_always_force(const char *filename) {
   return self;
 }
 
-static xdl_t *xdl_open_try_force(const char *filename) {
+static xdl_t *xdl_open_try_force(const char *filename, void *caller, void **handle) {
   // find
-  xdl_t *self = xdl_find(filename);
+  xdl_t *self = xdl_find(filename, caller, handle);
   if (NULL != self) return self;
 
   // try force dlopen()
-  return xdl_open_always_force(filename);
+  return xdl_open_always_force(filename, caller, handle);
 }
 
 void *xdl_open(const char *filename, int flags) {
   if (NULL == filename) return NULL;
 
+  void *caller = __builtin_return_address(0);
+  void *handle;
+
   xdl_t *self;
   if (flags & XDL_ALWAYS_FORCE_LOAD) {
-    self = xdl_open_always_force(filename);
+    self = xdl_open_always_force(filename, caller, &handle);
   } else if (flags & XDL_TRY_FORCE_LOAD) {
-    self = xdl_open_try_force(filename);
+    self = xdl_open_try_force(filename, caller, &handle);
   } else {
-    self = xdl_find(filename);
+    self = xdl_find(filename, caller, &handle);
   }
 
-  return NULL == self ? NULL : (void *)self->handle;
+  return NULL == self ? NULL : handle;
 }
 
 void *xdl_open2(struct dl_phdr_info *info) {
   if (NULL == info) return NULL;
 
-  // from xDL's global queue
-  xdl_t *self = xdl_queue_find_by_filename_and_increment_ref_count(info->dlpi_name);
-  if (NULL != self) return (void *)self->handle;
+  void *caller = __builtin_return_address(0);
+  void *handle;
 
-  // from provided info
+  // from xDL's global queue
+  xdl_t *self = xdl_queue_find_by_filename_and_increment_ref_count(info->dlpi_name, caller, &handle);
+  if (NULL != self) return handle;
+
+  // from struct dl_phdr_info *info
   self = xdl_create(info->dlpi_name, info->dlpi_addr, info->dlpi_phdr, info->dlpi_phnum);
   if (NULL != self) {
-    self = xdl_queue_add_new(self);
-    return (void *)self->handle;
+    self = xdl_queue_add_new(self, caller, &handle);
+    return NULL == self ? NULL : handle;
   }
 
   return NULL;
@@ -984,17 +1054,17 @@ static int xdl_open_by_addr_iterate_cb(struct dl_phdr_info *info, size_t size, v
   return 0;  // continue
 }
 
-static xdl_t *xdl_open_by_addr(void *addr) {
+static xdl_t *xdl_open_by_addr(void *addr, void *caller, void **handle) {
   if (NULL == addr) return NULL;
 
   // from xDL's global queue
-  xdl_t *self = xdl_queue_find_by_addr_and_increment_ref_count(addr);
+  xdl_t *self = xdl_queue_find_by_addr_and_increment_ref_count(addr, caller, handle);
   if (NULL != self) return self;
 
   // from dl_iterate_phdr()
   uintptr_t pkg[2] = {(uintptr_t)&self, (uintptr_t)addr};
   xdl_iterate_phdr(xdl_open_by_addr_iterate_cb, pkg, XDL_DEFAULT);
-  if (NULL != self) return xdl_queue_add_new(self);
+  if (NULL != self) return xdl_queue_add_new(self, caller, handle);
 
   return NULL;
 }
@@ -1063,15 +1133,12 @@ static ElfW(Sym) *xdl_dsym_by_addr(xdl_t *self, void *addr) {
 }
 
 typedef struct xdl_node {
-  struct xdl *obj;
+  xdl_t *obj;
+  void *handle;
   struct xdl_node *next;
 } xdl_node_t;
 
-int xdl_addr(void *addr, xdl_info_t *info, void **cache) {
-  return xdl_addr4(addr, info, cache, XDL_DEFAULT);
-}
-
-int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags) {
+static int xdl_addr_impl(void *addr, xdl_info_t *info, void **cache, int flags, void *caller) {
   if (NULL == addr || NULL == info || NULL == cache) return 0;
 
   memset(info, 0, sizeof(xdl_info_t));
@@ -1088,16 +1155,18 @@ int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags) {
 
   if (NULL == self) {
     // from xDL's global queue or create new object
-    self = xdl_open_by_addr(addr);
+    void *handle;
+    self = xdl_open_by_addr(addr, caller, &handle);
     if (NULL == self) return 0;
 
-    // save to cache
+    // save to local cache
     xdl_node_t *node = malloc(sizeof(xdl_node_t));
     if (NULL == node) {
-      xdl_close((void *)self->handle);
+      xdl_close(handle);
       return 0;
     }
     node->obj = self;
+    node->handle = handle;
     node->next = *(xdl_node_t **)cache;
     *(xdl_node_t **)cache = node;
   }
@@ -1134,15 +1203,25 @@ int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags) {
   return 1;
 }
 
+int xdl_addr(void *addr, xdl_info_t *info, void **cache) {
+  void *caller = __builtin_return_address(0);
+  return xdl_addr_impl(addr, info, cache, XDL_DEFAULT, caller);
+}
+
+int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags) {
+  void *caller = __builtin_return_address(0);
+  return xdl_addr_impl(addr, info, cache, flags, caller);
+}
+
 void xdl_addr_clean(void **cache) {
   if (NULL == cache) return;
 
   xdl_node_t *node = *((xdl_node_t **)cache);
   while (NULL != node) {
-    xdl_node_t *tmp = node;
+    xdl_node_t *cur = node;
     node = node->next;
-    xdl_close((void *)tmp->obj->handle);
-    free(tmp);
+    xdl_close(cur->handle);
+    free(cur);
   }
   *cache = NULL;
 }
@@ -1170,8 +1249,8 @@ int xdl_info(void *handle, int request, void *info) {
   return 0;
 }
 
-static int xdl_iterate_sym_callback(xdl_t *self, ElfW(Sym) *sym, bool is_symtab,
-                                    xdl_iterate_sym_callback_t callback, void *data) {
+static int xdl_iterate_symbol_callback(xdl_t *self, ElfW(Sym) *sym, bool is_symtab,
+                                       xdl_iterate_sym_callback_t callback, void *data) {
   const char *symbol;
   if (is_symtab) {
     if (!XDL_SYMTAB_IS_EXPORT_SYM(sym->st_shndx)) return 0;
@@ -1210,13 +1289,13 @@ void xdl_iterate_sym(void *handle, xdl_iterate_sym_callback_t callback, void *da
       if (n < self->gnu_hash.symoffset) continue;
       do {
         ElfW(Sym) *sym = self->dynsym + n;
-        if (0 != xdl_iterate_sym_callback(self, sym, false, callback, data)) return;
+        if (0 != xdl_iterate_symbol_callback(self, sym, false, callback, data)) return;
       } while ((chains_all[n++] & 1) == 0);
     }
   } else if (self->sysv_hash.chains_cnt > 0) {
     for (size_t i = 0; i < self->sysv_hash.chains_cnt; i++) {
       ElfW(Sym) *sym = self->dynsym + i;
-      if (0 != xdl_iterate_sym_callback(self, sym, false, callback, data)) return;
+      if (0 != xdl_iterate_symbol_callback(self, sym, false, callback, data)) return;
     }
   }
 }
@@ -1234,22 +1313,49 @@ void xdl_iterate_dsym(void *handle, xdl_iterate_sym_callback_t callback, void *d
   // iterate symbols
   for (size_t i = 0; i < self->symtab_cnt; i++) {
     ElfW(Sym) *sym = self->symtab + i;
-    if (0 != xdl_iterate_sym_callback(self, sym, true, callback, data)) return;
+    if (0 != xdl_iterate_symbol_callback(self, sym, true, callback, data)) return;
   }
 }
 
 void xdl_iterate_internal(int (*callback)(xdl_internal_t *, size_t, void *), void *data) {
+  if (NULL == callback) return;
+
   pthread_mutex_lock(&xdls_lock);
+
+  size_t max_ref_count = 0;
   xdl_t *self;
   TAILQ_FOREACH(self, &xdls, link) {
-    xdl_internal_t info;
-    info.dlpi_addr = self->load_bias;
-    info.dlpi_name = self->pathname;
-    info.dlpi_phdr = self->dlpi_phdr;
-    info.dlpi_phnum = self->dlpi_phnum;
-    info.handle = self->handle;
-    info.ref_count = self->ref_count;
-    if (0 != callback(&info, sizeof(xdl_internal_t), data)) break;
+    if (self->ref_count > max_ref_count) max_ref_count = self->ref_count;
   }
+  if (0 == max_ref_count) goto end;
+
+  // uintptr_t handle + uintptr_t caller
+  xdl_internal_t *info = malloc(sizeof(xdl_internal_t) + max_ref_count * sizeof(void *) * 2);
+  if (NULL == info) goto end;
+
+  TAILQ_FOREACH(self, &xdls, link) {
+    info->dlpi_addr = self->load_bias;
+    info->dlpi_name = self->pathname;
+    info->dlpi_phdr = self->dlpi_phdr;
+    info->dlpi_phnum = self->dlpi_phnum;
+    info->ref_count = self->ref_count;
+    info->memory_size = sizeof(xdl_t) + (NULL == self->pathname ? 0 : (strlen(self->pathname) + 1)) +
+                        self->symtab_cnt * sizeof(ElfW(Sym)) + self->strtab_sz +
+                        self->ref_count * sizeof(xdl_ref_t);
+
+    size_t i = 0;
+    xdl_ref_t *ref;
+    TAILQ_FOREACH(ref, &self->ref_queue, link) {
+      info->ref[i].handle = ref->handle;
+      info->ref[i].caller = ref->caller;
+      i++;
+    }
+
+    if (0 != callback(info, sizeof(xdl_internal_t) + self->ref_count * sizeof(void *) * 2, data)) break;
+  }
+
+  free(info);
+
+end:
   pthread_mutex_unlock(&xdls_lock);
 }

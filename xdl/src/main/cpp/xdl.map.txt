@@ -1,5 +1,7 @@
 {
     global:
+        JNI_OnLoad;
+        xdl_version;
         xdl_open;
         xdl_open2;
         xdl_close;
@@ -7,6 +9,7 @@
         xdl_dsym;
         xdl_iterate_sym;
         xdl_iterate_dsym;
+        xdl_preload;
         xdl_addr;
         xdl_addr4;
         xdl_addr_clean;

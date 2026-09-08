@@ -7,8 +7,9 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
+
+import io.github.hexhacking.xdl.Xdl;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -25,7 +26,13 @@ public class MainActivity extends AppCompatActivity {
 
         findViewById(R.id.testButton).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+                long libartHandle = Xdl.open("libart.so", true);
+                long libcHandle = Xdl.open("libc.so", true);
+
                 NativeSample.test();
+
+                Xdl.close(libartHandle);
+                Xdl.close(libcHandle);
             }
         });
     }

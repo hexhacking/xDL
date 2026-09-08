@@ -127,13 +127,22 @@ static void *sample_test_dlsym(const char *filename, const char *symbol, bool de
 
 static int sample_dump_internal_callback(xdl_internal_t *info, size_t size, void *data) {
   (void)size, (void)data;
-  LOG("xdl cache-queue: %s, load_bias 0x%" PRIxPTR ", handle 0x%" PRIxPTR ", ref_count %zu", info->dlpi_name,
-      info->dlpi_addr, info->handle, info->ref_count);
+
+  LOG("xdl internal: size %zu, %" PRIxPTR " %s (phdr %" PRIxPTR ", phnum %zu), mem_sz %zu, ref_count %zu",
+      size, info->dlpi_addr, info->dlpi_name, (uintptr_t)info->dlpi_phdr, info->dlpi_phnum, info->memory_size,
+      info->ref_count);
+  for (size_t i = 0; i < info->ref_count; i++) {
+    LOG("xdl internal: --> handle %" PRIxPTR ", caller %p", (uintptr_t)(info->ref[i].handle),
+        info->ref[i].caller);
+  }
+
   return 0;  // continue
 }
 
 static void sample_dump_internal(void) {
+  LOG("xdl internal: start ........................");
   xdl_iterate_internal(sample_dump_internal_callback, NULL);
+  LOG("xdl internal:   end ........................");
 }
 
 static void sample_test_cache_queue(void) {
@@ -154,7 +163,8 @@ static void sample_test_cache_queue(void) {
   sample_dump_internal();
 
   void *libart_handle = xdl_open("libart.so", XDL_DEFAULT);
-  LOG("test_cache xdl_open libart.so");
+  xdl_preload(libart_handle);
+  LOG("test_cache xdl_open + xdl_preload libart.so");
   sample_dump_internal();
 
   xdl_info(libart_handle, XDL_DI_DLINFO, (void *)&xdlinfo);
@@ -208,6 +218,9 @@ static void sample_test_iterate_sym(void) {
 static void sample_test(JNIEnv *env, jobject thiz) {
   (void)env;
   (void)thiz;
+
+  LOG("%s", xdl_version());
+  sample_dump_internal();
 
   // cache for xdl_addr()
   void *cache = NULL;

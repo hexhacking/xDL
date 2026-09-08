@@ -41,6 +41,9 @@
 extern "C" {
 #endif
 
+#define XDL_VERSION "3.0.0-alpha.0"
+const char *xdl_version(void);
+
 //
 // Enhanced dlopen() / dlclose() / dlsym().
 //
@@ -121,8 +124,12 @@ typedef struct {
   const ElfW(Phdr) *dlpi_phdr;  // Pointer to array of ELF program headers for this object.
   size_t dlpi_phnum;            // Number of items in dlpi_phdr.
   // added by xDL:
-  uintptr_t handle;  // Handle returned by xdl_open() or xdl_open2().
-  size_t ref_count;  // Reference count held by external users.
+  size_t memory_size;  // Memory usage of the current object.
+  size_t ref_count;    // Reference count held by external users.
+  struct {
+    void *handle;  // Handle value returned to xdl_open() or xdl_open2().
+    void *caller;  // Caller address of xdl_open() or xdl_open2().
+  } ref[];         // Reference info array. sizeof-this-array == ref_count
 } xdl_internal_t;
 
 void xdl_iterate_internal(int (*callback)(xdl_internal_t *, size_t, void *), void *data);
