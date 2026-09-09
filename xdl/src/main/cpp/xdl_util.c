@@ -116,11 +116,21 @@ size_t xdl_util_get_pagesize(void) {
   return val;
 }
 
+static bool xdl_util_ends_with_path_component(const char *str, const char *ending) {
+  size_t str_len = strlen(str);
+  size_t ending_len = strlen(ending);
+
+  if (ending_len > str_len) return false;
+  if (0 != strcmp(str + (str_len - ending_len), ending)) return false;
+  if (str_len == ending_len) return true;
+  return str[str_len - ending_len - 1] == '/';
+}
+
 bool xdl_util_match_pathname(const char *a, const char *b) {
   if ('/' == a[0] && '/' != b[0]) {
-    if (!xdl_util_ends_with(a, b)) return false;
+    if (!xdl_util_ends_with_path_component(a, b)) return false;
   } else if ('/' != a[0] && '/' == b[0]) {
-    if (!xdl_util_ends_with(b, a)) return false;
+    if (!xdl_util_ends_with_path_component(b, a)) return false;
   } else {
     if (0 != strcmp(a, b)) return false;
   }
