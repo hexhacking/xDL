@@ -713,10 +713,18 @@ static xdl_t *xdl_open_always_force(const char *filename, void *caller, void **h
 
   // find
   xdl_t *self = xdl_find(filename, caller, handle);
-  if (NULL == self)
+  if (NULL == self) {
     dlclose(linker_handle);
-  else
-    self->linker_handle = linker_handle;
+  } else {
+    void *dup = NULL;
+    pthread_mutex_lock(&xdls_lock);
+    if (NULL == self->linker_handle)
+      self->linker_handle = linker_handle;
+    else
+      dup = linker_handle;
+    pthread_mutex_unlock(&xdls_lock);
+    if (NULL != dup) dlclose(dup);
+  }
 
   return self;
 }
