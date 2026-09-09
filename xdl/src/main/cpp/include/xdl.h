@@ -22,8 +22,6 @@
 // Created by caikelun on 2020-10-04.
 
 //
-// xDL version: 2.5.0
-//
 // xDL is an enhanced implementation of the Android DL series functions.
 // For more information, documentation, and the latest version please check:
 // https://github.com/hexhacking/xDL
