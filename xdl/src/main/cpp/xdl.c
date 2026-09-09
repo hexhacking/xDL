@@ -300,7 +300,6 @@ static xdl_t *xdl_queue_add_new(xdl_t *self, void *caller, void **handle) {
   pthread_mutex_lock(&xdls_lock);
   TAILQ_FOREACH(tmp, &xdls, link) {
     if (xdl_util_match_pathname(tmp->pathname, self->pathname)) {
-      tmp->ref_count++;
       break;
     }
   }
