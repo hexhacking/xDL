@@ -10,6 +10,7 @@ android {
     enableKotlin = false
     defaultConfig {
         minSdkVersion rootProject.ext.minSdkVersion
+        consumerProguardFiles 'consumer-rules.pro'
         externalNativeBuild {
             cmake {
                 abiFilters rootProject.ext.abiFilters.split(",")
