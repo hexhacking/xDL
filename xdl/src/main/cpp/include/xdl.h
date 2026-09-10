@@ -79,7 +79,7 @@ void xdl_iterate_dsym(void *handle, xdl_iterate_sym_callback_t callback, void *d
 void xdl_preload(void *handle);
 
 //
-// Enhanced dladdr().
+// Enhanced dladdr() with an optional, independent local cache.
 //
 typedef struct {
   // same as Dl_info:

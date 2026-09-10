@@ -154,17 +154,26 @@ static void sample_test_cache_queue(void) {
   sample_dump_internal();
 
   void *libc_handle = xdl_open("libc.so", XDL_DEFAULT);
-  void *malloc_addr = xdl_sym(libc_handle, "malloc", NULL);
-  xdl_addr(malloc_addr, &xdlinfo, &cache);
-  LOG("test_cache xdl_open + xdl_addr libc.so");
+  LOG("test_cache xdl_open(libc.so)");
   sample_dump_internal();
+
+  void *malloc_addr = xdl_sym(libc_handle, "malloc", NULL);
+
+  xdl_addr(malloc_addr, &xdlinfo, &cache);
+  LOG("test_cache xdl_addr(libc.so, with-cache)");
+  sample_dump_internal();
+
   xdl_addr_clean(&cache);
-  LOG("test_cache xdl_open libc.so");
+  LOG("test_cache xdl_addr_clean(libc.so)");
+  sample_dump_internal();
+
+  xdl_addr(malloc_addr, &xdlinfo, NULL);
+  LOG("test_cache xdl_addr(libc.so, without-cache)");
   sample_dump_internal();
 
   void *libart_handle = xdl_open("libart.so", XDL_DEFAULT);
   xdl_preload(libart_handle);
-  LOG("test_cache xdl_open + xdl_preload libart.so");
+  LOG("test_cache xdl_open(libart.so) + xdl_preload(libart.so)");
   sample_dump_internal();
 
   xdl_info(libart_handle, XDL_DI_DLINFO, (void *)&xdlinfo);
@@ -173,17 +182,17 @@ static void sample_test_cache_queue(void) {
   dlinfo.dlpi_phdr = xdlinfo.dlpi_phdr;
   dlinfo.dlpi_phnum = (ElfW(Half))xdlinfo.dlpi_phnum;
   void *libart_handle2 = xdl_open2(&dlinfo);
-  LOG("test_cache xdl_open2 libart.so");
+  LOG("test_cache xdl_open2(libart.so)");
   sample_dump_internal();
 
   xdl_close(libart_handle);
-  LOG("test_cache xdl_close libart_handle");
+  LOG("test_cache xdl_close(libart_handle)");
   sample_dump_internal();
   xdl_close(libart_handle2);
-  LOG("test_cache xdl_close libart_handle2");
+  LOG("test_cache xdl_close(libart_handle2)");
   sample_dump_internal();
   xdl_close(libc_handle);
-  LOG("test_cache xdl_close libc_handle");
+  LOG("test_cache xdl_close(libc_handle)");
   sample_dump_internal();
 }
 

@@ -296,6 +296,8 @@ out:
 }
 
 static xdl_t *xdl_queue_add_new(xdl_t *self, void *caller, void **handle) {
+  *handle = NULL;
+
   xdl_t *tmp;
   pthread_mutex_lock(&xdls_lock);
   TAILQ_FOREACH(tmp, &xdls, link) {
@@ -1072,6 +1074,7 @@ static int xdl_open_by_addr_iterate_cb(struct dl_phdr_info *info, size_t size, v
 }
 
 static xdl_t *xdl_open_by_addr(void *addr, void *caller, void **handle) {
+  *handle = NULL;
   if (NULL == addr) return NULL;
 
   // from xDL's global queue
@@ -1149,43 +1152,47 @@ static ElfW(Sym) *xdl_dsym_by_addr(xdl_t *self, void *addr) {
   return NULL;
 }
 
-typedef struct xdl_node {
+typedef struct xdl_cache_node {
   xdl_t *obj;
   void *handle;
-  struct xdl_node *next;
-} xdl_node_t;
+  struct xdl_cache_node *next;
+} xdl_cache_node_t;
 
 static int xdl_addr_impl(void *addr, xdl_info_t *info, void **cache, int flags, void *caller) {
-  if (NULL == addr || NULL == info || NULL == cache) return 0;
+  if (NULL == addr || NULL == info) return 0;
 
   memset(info, 0, sizeof(xdl_info_t));
 
   // from local cache
   xdl_t *self = NULL;
-  for (xdl_node_t *node = *((xdl_node_t **)cache); NULL != node; node = node->next) {
-    if (xdl_elf_is_match_by_addr(node->obj->load_bias, node->obj->dlpi_phdr, node->obj->dlpi_phnum,
-                                 (uintptr_t)addr)) {
-      self = node->obj;
-      break;
+  if (NULL != cache) {
+    for (xdl_cache_node_t *node = *((xdl_cache_node_t **)cache); NULL != node; node = node->next) {
+      if (xdl_elf_is_match_by_addr(node->obj->load_bias, node->obj->dlpi_phdr, node->obj->dlpi_phnum,
+                                   (uintptr_t)addr)) {
+        self = node->obj;
+        break;
+      }
     }
   }
 
+  void *handle = NULL;
   if (NULL == self) {
     // from xDL's global queue or create new object
-    void *handle;
     self = xdl_open_by_addr(addr, caller, &handle);
     if (NULL == self) return 0;
 
     // save to local cache
-    xdl_node_t *node = malloc(sizeof(xdl_node_t));
-    if (NULL == node) {
-      xdl_close(handle);
-      return 0;
+    if (NULL != cache) {
+      xdl_cache_node_t *node = malloc(sizeof(xdl_cache_node_t));
+      if (NULL == node) {
+        xdl_close(handle);
+        return 0;
+      }
+      node->obj = self;
+      node->handle = handle;
+      node->next = *(xdl_cache_node_t **)cache;
+      *(xdl_cache_node_t **)cache = node;
     }
-    node->obj = self;
-    node->handle = handle;
-    node->next = *(xdl_node_t **)cache;
-    *(xdl_node_t **)cache = node;
   }
 
   // we have at least: load_bias, pathname, dlpi_phdr, dlpi_phnum
@@ -1217,6 +1224,8 @@ static int xdl_addr_impl(void *addr, xdl_info_t *info, void **cache, int flags, 
     }
   }
 
+  if (NULL == cache) xdl_close(handle);
+
   return 1;
 }
 
@@ -1233,9 +1242,9 @@ int xdl_addr4(void *addr, xdl_info_t *info, void **cache, int flags) {
 void xdl_addr_clean(void **cache) {
   if (NULL == cache) return;
 
-  xdl_node_t *node = *((xdl_node_t **)cache);
+  xdl_cache_node_t *node = *((xdl_cache_node_t **)cache);
   while (NULL != node) {
-    xdl_node_t *cur = node;
+    xdl_cache_node_t *cur = node;
     node = node->next;
     xdl_close(cur->handle);
     free(cur);
